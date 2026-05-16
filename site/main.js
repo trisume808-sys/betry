@@ -1,6 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
+const BUILD_ID = "20260516-1";
 
 const track = {
   halfWidth: 250,
@@ -58,7 +59,7 @@ const state = {
   speed: 0,
   offroad: false,
   finishMs: null,
-  build: (import.meta?.env?.VITE_BUILD_ID ?? "canvas").slice(0, 7),
+  build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
 
 const ui = {
@@ -747,7 +748,7 @@ const drawTopHud = (w, h) => {
   ctx.save();
   ctx.fillStyle = "rgba(10,10,18,0.62)";
   const boxW = Math.min(w * 0.42, 270);
-  drawRoundRect(pad, pad, boxW, 54, 16);
+  drawRoundRect(pad, pad, boxW, 72, 16);
   ctx.fill();
   ctx.fillStyle = "rgba(244,244,245,0.92)";
   ctx.font = `${Math.max(12, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
@@ -757,6 +758,7 @@ const drawTopHud = (w, h) => {
   ctx.fillStyle = "rgba(161,161,170,0.9)";
   ctx.font = `${Math.max(10, Math.floor(w * 0.016))}px ui-sans-serif, system-ui`;
   ctx.fillText(`build ${state.build}`, pad + 12, pad + 42);
+  ctx.fillText(`len ${finishDistance} / bends ${track.bends.length}`, pad + 12, pad + 60);
   ctx.restore();
 };
 
