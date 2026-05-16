@@ -1137,7 +1137,7 @@ const drawTopHud = (w, h) => {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   const titleY = pad + 32;
-  ctx.fillText("陀螺仪赛车", pad + 14, titleY);
+  ctx.fillText("零点漂移", pad + 14, titleY);
 
   const timeText =
     state.status === "running" ? formatMs(state.elapsedMs) : state.finishMs != null ? formatMs(state.finishMs) : "";
@@ -1248,7 +1248,7 @@ const drawSetupUi = (w, h) => {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   const titleY = y0 + 34;
-  ctx.fillText("陀螺仪赛车", x0 + 18, titleY);
+  ctx.fillText("零点漂移", x0 + 18, titleY);
   ctx.fillStyle = "rgba(161,161,170,0.95)";
   ctx.font = `${subFs}px ui-sans-serif, system-ui`;
   const subY = titleY + Math.floor(titleFs * 0.92) + 10;
