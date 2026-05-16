@@ -349,15 +349,53 @@ const state = {
 
 const getTrack = () => tracks[state.trackId] ?? tracks.track1;
 
-const elevation = (y) => getTrack().elevation(y);
+const trackCache = new Map();
+
+const sampleCurve = (arr, step, y) => {
+  const fy = Math.max(0, y) / step;
+  const i = Math.floor(fy);
+  const t = fy - i;
+  const a = arr[i] ?? 0;
+  const b = arr[i + 1] ?? a;
+  return a + (b - a) * t;
+};
+
+const getTrackCache = () => {
+  const trackId = state.trackId;
+  const track = getTrack();
+  const existing = trackCache.get(trackId);
+  if (existing && existing.fd === track.finishDistance) return existing;
+
+  const step = 10;
+  const maxY = track.finishDistance + 1300;
+  const n = Math.floor(maxY / step) + 3;
+  const center = new Float32Array(n);
+  const elev = new Float32Array(n);
+
+  for (let i = 0; i < n; i += 1) {
+    const y = i * step;
+    let x = 0;
+    for (const b of track.bends) {
+      const tt = (y - b.start) / b.length;
+      x += b.amp * bendShape(tt);
+    }
+    center[i] = x;
+    elev[i] = track.elevation(y);
+  }
+
+  const cache = { fd: track.finishDistance, step, center, elev };
+  trackCache.set(trackId, cache);
+  return cache;
+};
+
+const elevation = (y) => {
+  const c = getTrackCache();
+  return sampleCurve(c.elev, c.step, y);
+};
 
 const centerX = (y) => {
-  let x = 0;
-  for (const b of getTrack().bends) {
-    const t = (y - b.start) / b.length;
-    x += b.amp * bendShape(t);
-  }
-  return x;
+  const c = getTrackCache();
+  return sampleCurve(c.center, c.step, y);
 };
 
 const halfWidth = () => getTrack().halfWidth;
@@ -414,7 +452,7 @@ const touch = {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const dpr = () => Math.min(1.5, Math.max(1, window.devicePixelRatio || 1));
+const dpr = () => 1;
 
 const resize = () => {
   const ratio = dpr();
@@ -988,7 +1026,7 @@ const drawFinishBand = (cx, roadHalf, y) => {
 const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y0 = h * VIEW_Y0_T;
   const y1 = h * VIEW_Y1_T;
-  const steps = quality === 0 ? 26 : quality === 1 ? 34 : 46;
+  const steps = quality === 0 ? 18 : quality === 1 ? 26 : 40;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const elevScale = Math.min(0.11, h * 0.00018);
@@ -1088,34 +1126,36 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  const stripeH = 26;
-  const stripeW = 6;
-  const stripeGap = 18;
-  const stripePeriod = stripeH + stripeGap;
-  const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
-  ctx.globalAlpha = 0.55;
-  let stripeI = 0;
-  for (let y = y1 + stripeShift; y > y0 - stripePeriod; y -= stripePeriod) {
-    const yy = y;
-    const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
-    const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
-    const hw = Math.max(1, halfWidth(yWorld));
-    const scale = roadHalfPx / hw;
-    const cx = w / 2 + c * scale;
-    const elev = elevation(yWorld);
-    const yAdj = clamp(yy - elev * elevScale * (1 - t * 0.15), y0, y1);
-    const stripeColor = danger
-      ? "rgba(248,113,113,0.95)"
-      : stripeI % 2 === 0
-        ? "rgba(34,211,238,0.92)"
-        : "rgba(244,114,182,0.86)";
-    ctx.fillStyle = stripeColor;
-    drawRoundRect(cx - stripeW / 2, yAdj - stripeH, stripeW, stripeH, 3);
-    ctx.fill();
-    stripeI += 1;
+  if (quality >= 1) {
+    const stripeH = 26;
+    const stripeW = 6;
+    const stripeGap = 18;
+    const stripePeriod = stripeH + stripeGap;
+    const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
+    ctx.globalAlpha = 0.55;
+    let stripeI = 0;
+    for (let y = y1 + stripeShift; y > y0 - stripePeriod; y -= stripePeriod) {
+      const yy = y;
+      const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
+      const yWorld = distance + t * lookahead;
+      const c = centerX(yWorld) - carX;
+      const hw = Math.max(1, halfWidth(yWorld));
+      const scale = roadHalfPx / hw;
+      const cx = w / 2 + c * scale;
+      const elev = elevation(yWorld);
+      const yAdj = clamp(yy - elev * elevScale * (1 - t * 0.15), y0, y1);
+      const stripeColor = danger
+        ? "rgba(248,113,113,0.95)"
+        : stripeI % 2 === 0
+          ? "rgba(34,211,238,0.92)"
+          : "rgba(244,114,182,0.86)";
+      ctx.fillStyle = stripeColor;
+      drawRoundRect(cx - stripeW / 2, yAdj - stripeH, stripeW, stripeH, 3);
+      ctx.fill();
+      stripeI += 1;
+    }
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
 
   const finishT = (getTrack().finishDistance - distance) / lookahead;
   if (finishT > 0 && finishT < 1) {
@@ -1563,7 +1603,7 @@ const updateSim = (t) => {
   const dt = clamp(dtMs / 1000, 0, 0.05);
 
   avgDtMs = avgDtMs * 0.92 + dtMs * 0.08;
-  quality = avgDtMs > 34 ? 0 : avgDtMs > 24 ? 1 : 2;
+  quality = avgDtMs > 26 ? 0 : avgDtMs > 20 ? 1 : 2;
 
   const w = canvas.width;
   const h = canvas.height;
@@ -1678,8 +1718,8 @@ const drawFrame = (w, h) => {
   const danger = state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs;
   const heading = sim.roadAngle + sim.heading;
   drawRoadFlat(w, h, sim.x, sim.distance, heading, danger);
-  if (quality >= 1) drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading, danger);
-  if (quality >= 1) drawCockpit(w, h, state.offroad);
+  if (quality >= 2) drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading, danger);
+  if (quality >= 2) drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
   else drawSetupUi(w, h);
