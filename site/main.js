@@ -460,8 +460,8 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
 
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
-    const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
+    const yWorld = t * lookahead;
+    const c = centerX(yWorld);
     const cx = w / 2 + c * curveScale;
     const y = lerp(y1, y0, t);
     left.push([cx - roadHalfPx, y]);
@@ -497,22 +497,21 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = "#e5e7eb";
   for (let y = y1; y > y0; y -= stripeH + stripeGap) {
-    const dy = (distance * 0.22) % (stripeH + stripeGap);
-    const yy = y + dy;
+    const yy = y;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
-    const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
+    const yWorld = t * lookahead;
+    const c = centerX(yWorld);
     const cx = w / 2 + c * curveScale;
     drawRoundRect(cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  const finishT = (finishDistance - distance) / lookahead;
+  const finishT = finishDistance / lookahead;
   if (finishT > 0 && finishT < 1) {
     const y = lerp(y1, y0, finishT);
     const yWorld = finishDistance;
-    const c = centerX(yWorld) - carX;
+    const c = centerX(yWorld);
     const cx = w / 2 + c * curveScale;
     drawFinishBand(cx, roadHalfPx, y);
   }
@@ -818,52 +817,18 @@ const updateSim = (t) => {
   sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.32);
   state.tiltSmooth = sim.steerSmooth;
 
-  const baseSpeed = 260;
-  const carHalf = 12;
-  const y0 = sim.distance;
-  const c0 = centerX(y0);
-  const hw0 = halfWidth(y0);
-  const offroad0 = Math.abs(sim.x - c0) > hw0 - carHalf;
-  const speed0 = baseSpeed * (offroad0 ? 0.55 : 1);
-
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
-    const neutral = !touch.active && Math.abs(steerTarget) < 0.02;
-    const steerInput = clamp(sim.steerSmooth * state.sensitivity, -1, 1);
-    const maxSteerRad = 0.2;
-    const targetSteerAngle = neutral ? 0 : steerInput * maxSteerRad;
-    const steerRate = neutral ? state.returnRate : 12;
-    sim.steerAngle += clamp(targetSteerAngle - sim.steerAngle, -steerRate * dt, steerRate * dt);
-
-    const wheelBase = 210;
-    const yawRate = (speed0 / wheelBase) * Math.tan(sim.steerAngle) * state.steerStrength;
-    sim.heading += yawRate * dt;
-
-    sim.distance += speed0 * Math.cos(sim.heading) * dt;
-    sim.x += speed0 * Math.sin(sim.heading) * dt;
-
-    const ny = sim.distance;
-    const nc = centerX(ny);
-    const nhw = halfWidth(ny);
-    if (Math.abs(sim.x - nc) > nhw - carHalf) sim.x = nc + clamp(sim.x - nc, -(nhw - carHalf), nhw - carHalf);
-
-    if (sim.distance >= finishDistance) {
-      state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
-      state.status = "setup";
-      resetRun();
-    }
+    const maxHeadingRad = 0.55;
+    const targetHeading = steerTarget * maxHeadingRad;
+    const followRate = 8;
+    sim.heading = lerp(sim.heading, targetHeading, followRate * dt);
   }
-
-  const y1 = sim.distance;
-  const c1 = centerX(y1);
-  const hw1 = halfWidth(y1);
-  const offroad = Math.abs(sim.x - c1) > hw1 - carHalf;
-  const speed = baseSpeed * (offroad ? 0.55 : 1);
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
-  state.speed = speed;
-  state.offroad = offroad;
+  state.speed = 0;
+  state.offroad = false;
 
   drawFrame(w, h);
 };
