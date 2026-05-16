@@ -59,7 +59,7 @@ const buildTrack = () => {
 
 const track = buildTrack();
 const finishDistance = track.total;
-const roadHalfAt = () => 190;
+const roadHalfAt = () => 260;
 
 const trackAt = (s) => {
   const ss = clamp(s, 0, finishDistance);
@@ -84,7 +84,7 @@ const state = {
   sensorEnabled: false,
   sensorSupported: true,
   sensitivity: 3.2,
-  steerStrength: 2.4,
+  steerStrength: 1.25,
   returnRate: 7.5,
   calibration: 0,
   tiltRaw: 0,
@@ -409,7 +409,7 @@ canvas.addEventListener("pointercancel", onPointerUp);
 const setSliderByX = (key, x, rect) => {
   const t = clamp((x - rect.x) / rect.w, 0, 1);
   if (key === "sensitivity") state.sensitivity = 0.6 + t * (8 - 0.6);
-  if (key === "steerStrength") state.steerStrength = 0.8 + t * (4.2 - 0.8);
+  if (key === "steerStrength") state.steerStrength = 0.4 + t * (2.5 - 0.4);
   if (key === "returnRate") state.returnRate = 2 + t * (14 - 2);
 };
 
@@ -528,7 +528,7 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   const steps = 56;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
-  const curveScale = 0.24;
+  const curveScale = roadHalfPx / roadHalfAt(s0);
 
   const fwdX = Math.sin(carHeading);
   const fwdY = Math.cos(carHeading);
@@ -869,8 +869,8 @@ const drawSetupUi = (w, h) => {
     "steerStrength",
     { x: x0 + 14, y: sliderY + sliderH + 10, w: panelW - 28, h: sliderH },
     state.steerStrength,
-    0.8,
-    4.2,
+    0.4,
+    2.5,
     "转向强度",
   );
   drawSlider(
@@ -959,7 +959,7 @@ const updateSim = (t) => {
     sim.elapsedMs += dtMs;
     const neutral = !touch.active && Math.abs(steerTarget) < 0.02;
     const steerInput = clamp(sim.steerSmooth * state.sensitivity, -1, 1);
-    const maxSteerRad = 0.95;
+    const maxSteerRad = 0.2;
     const targetSteerAngle = neutral ? 0 : steerInput * maxSteerRad;
     const steerRate = neutral ? state.returnRate : 12;
     sim.steerAngle += clamp(targetSteerAngle - sim.steerAngle, -steerRate * dt, steerRate * dt);
