@@ -3,10 +3,16 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
 
 const track = {
-  halfWidth: 230,
+  halfWidth: 250,
   bends: [
-    { start: 120, length: 720, amp: -260 },
-    { start: 2120, length: 860, amp: 320 },
+    { start: 120, length: 680, amp: -260 },
+    { start: 1480, length: 780, amp: 320 },
+    { start: 2920, length: 640, amp: -220 },
+    { start: 4180, length: 900, amp: 360 },
+    { start: 5780, length: 700, amp: -320 },
+    { start: 7240, length: 860, amp: 260 },
+    { start: 8920, length: 760, amp: -360 },
+    { start: 10480, length: 980, amp: 300 },
   ],
 };
 
@@ -32,7 +38,7 @@ const roadAngleAt = (y) => {
   return Math.atan(d);
 };
 
-const finishDistance = 3600;
+const finishDistance = 12400;
 
 const state = {
   status: "setup",
