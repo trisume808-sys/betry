@@ -224,6 +224,18 @@ const drawPlayerSprite = (x, y, angleRad, sizePx, offroad, danger) => {
 
   const glow = danger ? playerGlowDanger : playerGlowNormal;
   if (glow) ctx.drawImage(glow.canvas, -glow.ax, -glow.ay);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.95;
+  ctx.shadowBlur = 22;
+  ctx.shadowColor = danger ? "rgba(248,113,113,0.55)" : "rgba(34,211,238,0.55)";
+  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = danger ? "rgba(255,180,180,0.45)" : "rgba(244,114,182,0.45)";
+  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
+  ctx.restore();
+
   ctx.shadowColor = "rgba(0,0,0,0.65)";
   ctx.shadowBlur = 8;
   ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
@@ -831,24 +843,81 @@ const drawSlider = (key, rect, value, min, max, label) => {
 };
 
 const drawSky = (w, h) => {
+  const t = (state.elapsedMs || 0) * 0.001;
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "#f3f4f6");
-  g.addColorStop(0.65, "#e5e7eb");
-  g.addColorStop(1, "#d1d5db");
+  g.addColorStop(0, "#04040a");
+  g.addColorStop(0.55, "#05050f");
+  g.addColorStop(1, "#070712");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
+  const horizonY = h * 0.46;
   ctx.save();
-  ctx.globalAlpha = 0.18;
-  for (let i = 0; i < 36; i += 1) {
-    const x = (w * (i * 37 % 97)) / 97;
-    const y = (h * (i * 19 % 83)) / 83;
-    const r = 1 + ((i * 13) % 4);
-    ctx.fillStyle = "rgba(148,163,184,0.55)";
+  const glow = ctx.createRadialGradient(w * 0.5, horizonY, 10, w * 0.5, horizonY, Math.max(w, h) * 0.82);
+  glow.addColorStop(0, "rgba(34,211,238,0.16)");
+  glow.addColorStop(0.42, "rgba(244,114,182,0.08)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  for (let i = 0; i < 64; i += 1) {
+    const x = (w * ((i * 53) % 257)) / 257;
+    const y = (h * ((i * 97) % 233)) / 233;
+    const tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.7));
+    const r = 0.8 + ((i * 19) % 4) * 0.55;
+    ctx.globalAlpha = 0.08 + tw * 0.16;
+    ctx.fillStyle = i % 7 === 0 ? "rgba(34,211,238,0.85)" : "rgba(226,232,240,0.75)";
     ctx.beginPath();
-    ctx.arc(x, y * 0.4, r, 0, Math.PI * 2);
+    ctx.arc(x, y * 0.5, r, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+
+  const shift = (((state.distance || 0) * 0.002) % 1 + 1) % 1;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineWidth = 1.25;
+  for (let i = 0; i < 26; i += 1) {
+    const tt = (i + shift) / 26;
+    const p = tt * tt;
+    const y = lerp(horizonY + 6, h, p);
+    const a = 0.02 + (1 - tt) * 0.11;
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = i % 2 === 0 ? "rgba(34,211,238,0.8)" : "rgba(244,114,182,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.1;
+  ctx.strokeStyle = "rgba(34,211,238,0.8)";
+  for (let i = 0; i <= 14; i += 1) {
+    const x = lerp(-w * 0.15, w * 1.15, i / 14);
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5, horizonY);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
+const drawPostFx = (w, h) => {
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 0.06;
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
+  ctx.restore();
+
+  ctx.save();
+  const v = ctx.createRadialGradient(w * 0.5, h * 0.55, Math.min(w, h) * 0.2, w * 0.5, h * 0.55, Math.max(w, h) * 0.72);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
   ctx.restore();
 };
 
@@ -902,12 +971,12 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   }
 
   ctx.save();
-  ctx.fillStyle = "rgba(229,231,235,0.95)";
+  ctx.fillStyle = "rgba(6,8,14,1)";
   ctx.fillRect(0, y0, w, y1 - y0);
 
   const asphalt = ctx.createLinearGradient(0, y0, 0, y1);
-  asphalt.addColorStop(0, "rgba(156,163,175,0.92)");
-  asphalt.addColorStop(1, "rgba(107,114,128,0.95)");
+  asphalt.addColorStop(0, "rgba(12,14,24,0.92)");
+  asphalt.addColorStop(1, "rgba(5,6,12,0.98)");
 
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
@@ -932,25 +1001,47 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   ctx.lineWidth = edgeW;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  const leftEdge = danger ? "rgba(248,113,113,0.95)" : "rgba(34,211,238,0.92)";
+  const rightEdge = danger ? "rgba(248,113,113,0.95)" : "rgba(244,114,182,0.90)";
+
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
   for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
-  ctx.strokeStyle = "rgba(248,250,252,0.85)";
+  ctx.strokeStyle = leftEdge;
   ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(right[0][0], right[0][1]);
   for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.strokeStyle = "rgba(248,250,252,0.85)";
+  ctx.strokeStyle = rightEdge;
   ctx.stroke();
 
-  ctx.lineWidth = edgeW * 2.4;
-  ctx.globalAlpha = 0.22;
-  ctx.strokeStyle = "rgba(148,163,184,0.55)";
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.75;
+  ctx.lineWidth = edgeW * 2.6;
+  ctx.shadowBlur = edgeW * 10;
+  ctx.shadowColor = leftEdge;
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
+  ctx.strokeStyle = leftEdge;
+  ctx.stroke();
+  ctx.shadowColor = rightEdge;
+  ctx.beginPath();
+  ctx.moveTo(right[0][0], right[0][1]);
+  for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.strokeStyle = rightEdge;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.lineWidth = edgeW * 3.6;
+  ctx.globalAlpha = 0.08;
+  ctx.strokeStyle = "rgba(34,211,238,0.7)";
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
   for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(148,163,184,0.55)";
+  ctx.strokeStyle = "rgba(244,114,182,0.7)";
   ctx.beginPath();
   ctx.moveTo(right[0][0], right[0][1]);
   for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
@@ -962,8 +1053,8 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const stripeGap = 18;
   const stripePeriod = stripeH + stripeGap;
   const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
-  ctx.globalAlpha = 0.45;
-  ctx.fillStyle = "rgba(248,250,252,0.95)";
+  ctx.globalAlpha = 0.55;
+  let stripeI = 0;
   for (let y = y1 + stripeShift; y > y0 - stripePeriod; y -= stripePeriod) {
     const yy = y;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
@@ -974,8 +1065,15 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
     const cx = w / 2 + c * scale;
     const elev = elevation(yWorld);
     const yAdj = clamp(yy - elev * elevScale * (1 - t * 0.15), y0, y1);
+    const stripeColor = danger
+      ? "rgba(248,113,113,0.95)"
+      : stripeI % 2 === 0
+        ? "rgba(34,211,238,0.92)"
+        : "rgba(244,114,182,0.86)";
+    ctx.fillStyle = stripeColor;
     drawRoundRect(cx - stripeW / 2, yAdj - stripeH, stripeW, stripeH, 3);
     ctx.fill();
+    stripeI += 1;
   }
   ctx.globalAlpha = 1;
 
@@ -1099,15 +1197,18 @@ const drawCockpit = (w, h, offroad) => {
   ctx.save();
   const rg = ctx.createLinearGradient(0, y0, 0, h);
   rg.addColorStop(0, "rgba(0,0,0,0)");
-  rg.addColorStop(0.15, "rgba(15,23,42,0.55)");
-  rg.addColorStop(1, "rgba(15,23,42,0.82)");
+  rg.addColorStop(0.12, "rgba(10,10,18,0.55)");
+  rg.addColorStop(1, "rgba(7,7,16,0.92)");
   ctx.fillStyle = rg;
   ctx.fillRect(0, y0, w, cockpitH);
 
   const dashY = h - cockpitH * 0.76;
-  ctx.fillStyle = "rgba(15,23,42,0.62)";
+  ctx.fillStyle = "rgba(10,10,18,0.68)";
   drawRoundRect(w * 0.06, dashY, w * 0.88, cockpitH * 0.48, 22);
   ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = offroad ? "rgba(248,113,113,0.35)" : "rgba(34,211,238,0.22)";
+  ctx.stroke();
 
   const wheelR = Math.min(w, h) * 0.12;
   const wx = w * 0.5;
@@ -1117,7 +1218,7 @@ const drawCockpit = (w, h, offroad) => {
   ctx.beginPath();
   ctx.arc(wx, wy, wheelR, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = offroad ? "rgba(248,113,113,0.65)" : "rgba(15,23,42,0.32)";
+  ctx.strokeStyle = offroad ? "rgba(248,113,113,0.65)" : "rgba(34,211,238,0.22)";
   ctx.beginPath();
   ctx.arc(wx, wy, wheelR * 0.66, -Math.PI * 0.15, Math.PI * 1.15);
   ctx.stroke();
@@ -1134,7 +1235,7 @@ const drawCockpit = (w, h, offroad) => {
   ctx.stroke();
   ctx.restore();
 
-  const light = offroad ? "rgba(248,113,113,0.85)" : "rgba(15,23,42,0.65)";
+  const light = offroad ? "rgba(248,113,113,0.85)" : "rgba(34,211,238,0.42)";
   ctx.fillStyle = light;
   drawRoundRect(w * 0.08, dashY + 14, w * 0.18, 10, 6);
   ctx.fill();
@@ -1565,6 +1666,7 @@ const drawFrame = (w, h) => {
     );
     ctx.restore();
   }
+  drawPostFx(w, h);
   drawFullscreenExitOverlay(w, h);
 };
 
