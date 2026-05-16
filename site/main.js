@@ -1,7 +1,33 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
-const centerX = () => 0;
-const halfWidth = () => 230;
+
+const track = {
+  halfWidth: 230,
+  bends: [
+    { start: 520, length: 980, amp: -180 },
+    { start: 2320, length: 980, amp: 240 },
+  ],
+};
+
+const bendShape = (t) => Math.sin(clamp(t, 0, 1) * Math.PI);
+
+const centerX = (y) => {
+  let x = 0;
+  for (const b of track.bends) {
+    const t = (y - b.start) / b.length;
+    x += b.amp * bendShape(t);
+  }
+  return x;
+};
+
+const halfWidth = () => track.halfWidth;
+
+const roadAngleAt = (y) => {
+  const eps = 14;
+  const d = (centerX(y + eps) - centerX(y - eps)) / (2 * eps);
+  return Math.atan(d);
+};
+
 const finishDistance = 3600;
 
 const state = {
@@ -35,6 +61,7 @@ const ui = {
 const sim = {
   x: 0,
   heading: 0,
+  roadAngle: 0,
   distance: 0,
   elapsedMs: 0,
   steerSmooth: 0,
@@ -877,6 +904,7 @@ const updateSim = (t) => {
   const carHalfNow = 12;
   const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > hwNow - carHalfNow;
   const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
+  sim.roadAngle = roadAngleAt(yNow);
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
@@ -889,8 +917,9 @@ const updateSim = (t) => {
 const drawFrame = (w, h) => {
   ctx.clearRect(0, 0, w, h);
   drawSky(w, h);
-  drawRoadFlat(w, h, sim.x, sim.distance, sim.heading);
-  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, sim.heading);
+  const heading = sim.roadAngle + sim.heading;
+  drawRoadFlat(w, h, sim.x, sim.distance, heading);
+  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
