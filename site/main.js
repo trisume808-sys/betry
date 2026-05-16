@@ -7,6 +7,153 @@ const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
 const WALL_HIT_EPS_PX = 1;
 
+const roundRectPath = (g, x, y, w, h, r) => {
+  const rr = Math.min(r, w / 2, h / 2);
+  g.beginPath();
+  g.moveTo(x + rr, y);
+  g.lineTo(x + w - rr, y);
+  g.quadraticCurveTo(x + w, y, x + w, y + rr);
+  g.lineTo(x + w, y + h - rr);
+  g.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  g.lineTo(x + rr, y + h);
+  g.quadraticCurveTo(x, y + h, x, y + h - rr);
+  g.lineTo(x, y + rr);
+  g.quadraticCurveTo(x, y, x + rr, y);
+  g.closePath();
+};
+
+const createHypercarSprite = ({ width = 56, height = 112, scale = 2 } = {}) => {
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+
+  const off = document.createElement("canvas");
+  off.width = w;
+  off.height = h;
+  const g = off.getContext("2d");
+  if (!g) return { canvas: off, w, h, ax: w / 2, ay: h / 2 };
+
+  const c = {
+    bodyDark: "#0a0c0f",
+    bodyLight: "#1b222a",
+    glassTop: "rgba(55,105,140,0.45)",
+    glassBottom: "rgba(10,20,28,0.86)",
+    trim: "rgba(255,255,255,0.10)",
+    light: "rgba(160,220,255,0.85)",
+    shadow: "rgba(0,0,0,0.48)",
+  };
+
+  g.clearRect(0, 0, w, h);
+
+  const bodyX = 6 * scale;
+  const bodyY = 3.5 * scale;
+  const bodyW = w - 12 * scale;
+  const bodyH = h - 7 * scale;
+  const bodyR = 14 * scale;
+
+  const bodyGrad = g.createLinearGradient(0, bodyY, 0, bodyY + bodyH);
+  bodyGrad.addColorStop(0, c.bodyLight);
+  bodyGrad.addColorStop(0.55, c.bodyDark);
+  bodyGrad.addColorStop(1, c.bodyLight);
+
+  roundRectPath(g, bodyX, bodyY, bodyW, bodyH, bodyR);
+  g.fillStyle = bodyGrad;
+  g.fill();
+
+  g.save();
+  g.globalCompositeOperation = "source-atop";
+  const spine = g.createLinearGradient(0, 0, w, 0);
+  spine.addColorStop(0, "rgba(255,255,255,0)");
+  spine.addColorStop(0.38, "rgba(255,255,255,0.16)");
+  spine.addColorStop(0.58, "rgba(255,255,255,0.06)");
+  spine.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = spine;
+  g.beginPath();
+  g.ellipse(w * 0.52, h * 0.52, w * 0.18, h * 0.44, -0.2, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+
+  const noseY = bodyY + bodyH * 0.14;
+  const noseW = bodyW * 0.72;
+  const noseX = (w - noseW) / 2;
+  const noseH = bodyH * 0.16;
+  g.fillStyle = c.shadow;
+  roundRectPath(g, noseX, noseY, noseW, noseH, 10 * scale);
+  g.fill();
+
+  const intakeY = bodyY + bodyH * 0.78;
+  g.fillStyle = "rgba(0,0,0,0.36)";
+  roundRectPath(g, w * 0.16, intakeY, w * 0.68, bodyH * 0.09, 10 * scale);
+  g.fill();
+
+  const cabinY = bodyY + bodyH * 0.23;
+  const cabinH = bodyH * 0.38;
+  const glassGrad = g.createLinearGradient(0, cabinY, 0, cabinY + cabinH);
+  glassGrad.addColorStop(0, c.glassTop);
+  glassGrad.addColorStop(1, c.glassBottom);
+  g.fillStyle = glassGrad;
+  g.beginPath();
+  g.ellipse(w * 0.5, cabinY + cabinH * 0.56, w * 0.18, cabinH * 0.46, 0, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = c.trim;
+  g.lineWidth = Math.max(1.5, 1.6 * scale);
+  g.beginPath();
+  g.ellipse(w * 0.5, cabinY + cabinH * 0.56, w * 0.205, cabinH * 0.51, 0, 0, Math.PI * 2);
+  g.stroke();
+
+  const headY = bodyY + bodyH * 0.12;
+  g.fillStyle = c.light;
+  g.beginPath();
+  g.ellipse(w * 0.28, headY + bodyH * 0.085, w * 0.085, bodyH * 0.048, -0.55, 0, Math.PI * 2);
+  g.ellipse(w * 0.72, headY + bodyH * 0.085, w * 0.085, bodyH * 0.048, 0.55, 0, Math.PI * 2);
+  g.fill();
+
+  const wheel = (cx, cy) => {
+    g.fillStyle = "rgba(0,0,0,0.78)";
+    roundRectPath(g, cx - w * 0.105, cy - h * 0.06, w * 0.21, h * 0.12, 12 * scale);
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,0.06)";
+    roundRectPath(g, cx - w * 0.062, cy - h * 0.03, w * 0.124, h * 0.06, 10 * scale);
+    g.fill();
+  };
+
+  wheel(w * 0.19, h * 0.34);
+  wheel(w * 0.81, h * 0.34);
+  wheel(w * 0.19, h * 0.74);
+  wheel(w * 0.81, h * 0.74);
+
+  const badgeY = bodyY + bodyH * 0.44;
+  g.fillStyle = "rgba(255,206,84,0.85)";
+  roundRectPath(g, w * 0.48, badgeY, w * 0.04, bodyH * 0.045, 3 * scale);
+  g.fill();
+
+  const shadowGrad = g.createRadialGradient(w * 0.5, h * 0.58, w * 0.12, w * 0.5, h * 0.58, w * 0.5);
+  shadowGrad.addColorStop(0, "rgba(0,0,0,0)");
+  shadowGrad.addColorStop(1, "rgba(0,0,0,0.22)");
+  g.fillStyle = shadowGrad;
+  g.fillRect(0, 0, w, h);
+
+  return { canvas: off, w, h, ax: w / 2, ay: h / 2 };
+};
+
+const playerSprite = createHypercarSprite({ scale: 2 });
+
+const drawPlayerSprite = (x, y, angleRad, sizePx, offroad) => {
+  const s = Math.max(0.001, sizePx / playerSprite.h);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angleRad);
+  ctx.scale(s, s);
+  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
+  if (offroad) {
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "rgba(248,113,113,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, playerSprite.w * 0.22, playerSprite.h * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+};
+
 const tracks = {
   track1: {
     id: "track1",
@@ -715,20 +862,8 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.lineTo(carMarkerX, carMarkerY + 12);
   ctx.stroke();
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "rgba(244,244,245,0.22)";
-  drawRoundRect(carMarkerX - 10, carMarkerY - 16, 20, 32, 6);
-  ctx.fill();
-  ctx.fillStyle = "rgba(52,211,153,0.92)";
-  ctx.beginPath();
-  ctx.save();
-  ctx.translate(carMarkerX, carMarkerY - 18);
-  ctx.rotate(heading);
-  ctx.moveTo(0, -10);
-  ctx.lineTo(8, 10);
-  ctx.lineTo(-8, 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  const sizePx = clamp(Math.min(w, h) * 0.07, 30, 54);
+  drawPlayerSprite(carMarkerX, carMarkerY - 14, heading, sizePx, state.offroad);
   ctx.restore();
 
   const fog = ctx.createLinearGradient(0, y0, 0, y1);
@@ -807,17 +942,8 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const carT = clamp(distance / fd, 0, 1);
   const carPx = mapX(carX);
   const carPy = mapY(carT);
-  ctx.save();
-  ctx.translate(carPx, carPy);
-  ctx.rotate(Math.PI + heading);
-  ctx.fillStyle = offroad ? "rgba(248,113,113,0.95)" : "rgba(52,211,153,0.95)";
-  ctx.beginPath();
-  ctx.moveTo(0, -8);
-  ctx.lineTo(6, 8);
-  ctx.lineTo(-6, 8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  const icon = clamp(mapW * 0.085, 10, 16);
+  drawPlayerSprite(carPx, carPy, Math.PI + heading, icon, offroad);
   ctx.restore();
 };
 
