@@ -543,17 +543,32 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
     const t = i / steps;
     const s = s0 + t * lookahead;
     const center = trackAt(s);
-    const dx = center.x - carX;
-    const dyW = center.y - carY;
-    const f = dot(dx, dyW, fwdX, fwdY);
-    const r = dot(dx, dyW, rightX, rightY);
+    const dxC = center.x - carX;
+    const dyC = center.y - carY;
+    const f = dot(dxC, dyC, fwdX, fwdY);
     const tt = clamp(f / lookahead, 0, 1);
     const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
-    const roadHalf = roadHalfAt(s) * curveScale * scale;
-    const cx = w / 2 + r * curveScale * scale;
+
+    const roadHalfW = roadHalfAt(s);
+    const rnX = Math.cos(center.heading);
+    const rnY = -Math.sin(center.heading);
+    const lxW = center.x - rnX * roadHalfW;
+    const lyW = center.y - rnY * roadHalfW;
+    const rxW = center.x + rnX * roadHalfW;
+    const ryW = center.y + rnY * roadHalfW;
+
+    const ldx = lxW - carX;
+    const ldy = lyW - carY;
+    const rdx = rxW - carX;
+    const rdy = ryW - carY;
+
+    const lR = dot(ldx, ldy, rightX, rightY);
+    const rR = dot(rdx, rdy, rightX, rightY);
+    const cxL = w / 2 + lR * curveScale * scale;
+    const cxR = w / 2 + rR * curveScale * scale;
     const y = lerp(y1, y0, tt);
-    left.push([cx - roadHalf, y, tt]);
-    right.push([cx + roadHalf, y, tt]);
+    left.push([cxL, y, tt]);
+    right.push([cxR, y, tt]);
   }
 
   ctx.save();
