@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { startTiltStream } from "@/input/sensorInput";
+import { getTrack } from "@/game/tracks";
+import type { TrackDef } from "@/game/tracks";
 import { useGameStore } from "@/store/gameStore";
 
 function clamp(v: number, min: number, max: number) {
@@ -8,14 +10,6 @@ function clamp(v: number, min: number, max: number) {
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
-}
-
-function centerX(y: number) {
-  return 110 * Math.sin(y * 0.0022) + 70 * Math.sin(y * 0.0011 + 1.7);
-}
-
-function halfWidth(y: number) {
-  return 135 + 18 * Math.sin(y * 0.0007 + 0.5);
 }
 
 function dpr() {
@@ -31,8 +25,10 @@ export default function GameCanvas() {
   const sensorEnabled = useGameStore((s) => s.sensorEnabled);
   const calibration = useGameStore((s) => s.calibration);
   const sensitivity = useGameStore((s) => s.sensitivity);
+  const trackId = useGameStore((s) => s.trackId);
 
-  const finishDistance = useMemo(() => 1800, []);
+  const track = useMemo(() => getTrack(trackId), [trackId]);
+  const finishDistance = track.finishDistance;
 
   const sensorRef = useRef({ raw: 0, mapped: 0, hasData: false });
   const touchRef = useRef({ active: false, startX: 0, steer: 0 });
@@ -127,13 +123,15 @@ export default function GameCanvas() {
       const follow = 1 - Math.pow(0.001, dt);
       sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.18);
 
-      const baseSpeed = 260;
+      const baseSpeed = track.baseSpeed;
       const y = sim.distance;
-      const c = centerX(y);
-      const hw = halfWidth(y);
+      const c = track.centerX(y);
+      const hw = track.halfWidth(y);
       const carHalf = 12;
       const offroad = Math.abs(sim.x - c) > hw - carHalf;
-      const speed = baseSpeed * (offroad ? 0.55 : 1);
+      const slope = (track.elevation(y + 6) - track.elevation(y)) / 6;
+      const slopeFactor = clamp(1 - slope * 1.2, 0.72, 1.32);
+      const speed = baseSpeed * (offroad ? 0.55 : 1) * slopeFactor;
 
       if (status === "running") {
         sim.elapsedMs += dtMs;
@@ -147,8 +145,8 @@ export default function GameCanvas() {
         }
 
         const ny = sim.distance;
-        const nc = centerX(ny);
-        const nhw = halfWidth(ny);
+        const nc = track.centerX(ny);
+        const nhw = track.halfWidth(ny);
         if (Math.abs(sim.x - nc) > nhw - carHalf) {
           sim.x = nc + clamp(sim.x - nc, -(nhw - carHalf), nhw - carHalf);
         }
@@ -168,6 +166,7 @@ export default function GameCanvas() {
         distance: sim.distance,
         finishDistance,
         offroad,
+        track,
       });
 
       if (t - sim.lastTelemetryT > 90) {
@@ -187,7 +186,7 @@ export default function GameCanvas() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [calibration, finishDistance, inputMode, sensorEnabled, sensitivity, status]);
+  }, [calibration, finishDistance, inputMode, sensorEnabled, sensitivity, status, track]);
 
   return (
     <div
@@ -240,15 +239,16 @@ function drawScene(
     distance: number;
     finishDistance: number;
     offroad: boolean;
+    track: TrackDef;
   },
 ) {
-  const { w, h, carX, distance, finishDistance, offroad } = params;
+  const { w, h, carX, distance, finishDistance, offroad, track } = params;
 
   ctx.clearRect(0, 0, w, h);
 
   drawSky(ctx, w, h);
-  drawRoadFlat(ctx, { w, h, carX, distance, finishDistance });
-  drawMiniMap(ctx, { w, h, carX, distance, finishDistance, offroad });
+  drawRoadFlat(ctx, { w, h, carX, distance, finishDistance, track });
+  drawMiniMap(ctx, { w, h, carX, distance, finishDistance, offroad, track });
   drawCockpit(ctx, { w, h, offroad });
   drawViewLabel(ctx, { w, h });
 }
@@ -300,9 +300,10 @@ function drawRoadFlat(
     carX: number;
     distance: number;
     finishDistance: number;
+    track: TrackDef;
   },
 ) {
-  const { w, h, carX, distance, finishDistance } = params;
+  const { w, h, carX, distance, finishDistance, track } = params;
   const y0 = h * 0.16;
   const y1 = h * 0.9;
   const steps = 56;
@@ -310,6 +311,7 @@ function drawRoadFlat(
 
   const roadHalfPx = Math.min(w * 0.28, 240);
   const curveScale = 0.22;
+  const elevScale = Math.min(0.11, h * 0.00018);
 
   const left: Array<[number, number]> = [];
   const right: Array<[number, number]> = [];
@@ -317,9 +319,10 @@ function drawRoadFlat(
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
     const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
+    const c = track.centerX(yWorld) - carX;
     const cx = w / 2 + c * curveScale;
-    const y = lerp(y1, y0, t);
+    const elev = track.elevation(yWorld);
+    const y = clamp(lerp(y1, y0, t) - elev * elevScale * (1 - t * 0.15), y0, y1);
     left.push([cx - roadHalfPx, y]);
     right.push([cx + roadHalfPx, y]);
   }
@@ -357,16 +360,15 @@ function drawRoadFlat(
 
   const stripeH = 26;
   const stripeW = 6;
-  const stripeGap = 18;
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = "#e5e7eb";
-  for (let y = y1; y > y0; y -= stripeH + stripeGap) {
-    const dy = (distance * 0.22) % (stripeH + stripeGap);
-    const yy = y + dy;
-    const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
+  for (let i = 2; i <= steps; i += 4) {
+    const t = i / steps;
     const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
+    const c = track.centerX(yWorld) - carX;
     const cx = w / 2 + c * curveScale;
+    const elev = track.elevation(yWorld);
+    const yy = clamp(lerp(y1, y0, t) - elev * elevScale * (1 - t * 0.15), y0, y1);
     roundRect(ctx, cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
   }
@@ -374,9 +376,14 @@ function drawRoadFlat(
 
   const finishT = (finishDistance - distance) / lookahead;
   if (finishT > 0 && finishT < 1) {
-    const y = lerp(y1, y0, finishT);
+    const elev = track.elevation(finishDistance);
+    const y = clamp(
+      lerp(y1, y0, finishT) - elev * elevScale * (1 - finishT * 0.15),
+      y0,
+      y1,
+    );
     const yWorld = finishDistance;
-    const c = centerX(yWorld) - carX;
+    const c = track.centerX(yWorld) - carX;
     const cx = w / 2 + c * curveScale;
     drawFinishBand(ctx, { cx, roadHalf: roadHalfPx, y, w });
   }
@@ -427,9 +434,10 @@ function drawMiniMap(
     distance: number;
     finishDistance: number;
     offroad: boolean;
+    track: TrackDef;
   },
 ) {
-  const { w, carX, distance, finishDistance, offroad } = params;
+  const { w, carX, distance, finishDistance, offroad, track } = params;
   const pad = 14;
   const mapW = Math.min(w * 0.34, 260);
   const mapH = mapW * 0.72;
@@ -450,8 +458,8 @@ function drawMiniMap(
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
     const yWorld = lerp(start, end, t);
-    const c = centerX(yWorld) - carX;
-    const hw = halfWidth(yWorld);
+    const c = track.centerX(yWorld) - carX;
+    const hw = track.halfWidth(yWorld);
     maxAbs = Math.max(maxAbs, Math.abs(c) + hw);
     ptsL.push([c - hw, yWorld, t]);
     ptsR.push([c + hw, yWorld, t]);

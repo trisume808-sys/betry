@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { TrackId } from "@/game/tracks";
 
 export type GameStatus = "idle" | "running" | "finished";
 export type InputMode = "sensor" | "touch";
@@ -18,6 +19,8 @@ type GameState = {
   status: GameStatus;
   inputMode: InputMode;
 
+  trackId: TrackId;
+
   sensorSupported: boolean;
   sensorPermission: SensorPermission;
   sensorEnabled: boolean;
@@ -29,6 +32,7 @@ type GameState = {
   finishMs: number | null;
 
   setInputMode: (mode: InputMode) => void;
+  setTrackId: (trackId: TrackId) => void;
   setSensorSupported: (supported: boolean) => void;
   setSensorPermission: (permission: SensorPermission) => void;
   setSensorEnabled: (enabled: boolean) => void;
@@ -53,6 +57,7 @@ const defaultTelemetry: Telemetry = {
 export const useGameStore = create<GameState>((set) => ({
   status: "idle",
   inputMode: "sensor",
+  trackId: "track1",
   sensorSupported: true,
   sensorPermission: "unknown",
   sensorEnabled: false,
@@ -62,6 +67,7 @@ export const useGameStore = create<GameState>((set) => ({
   finishMs: null,
 
   setInputMode: (mode) => set({ inputMode: mode }),
+  setTrackId: (trackId) => set({ trackId }),
   setSensorSupported: (supported) => set({ sensorSupported: supported }),
   setSensorPermission: (permission) => set({ sensorPermission: permission }),
   setSensorEnabled: (enabled) => set({ sensorEnabled: enabled }),

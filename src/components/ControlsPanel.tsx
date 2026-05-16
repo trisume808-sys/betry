@@ -58,6 +58,9 @@ export default function ControlsPanel() {
   const inputMode = useGameStore((s) => s.inputMode);
   const setInputMode = useGameStore((s) => s.setInputMode);
 
+  const trackId = useGameStore((s) => s.trackId);
+  const setTrackId = useGameStore((s) => s.setTrackId);
+
   const sensorSupported = useGameStore((s) => s.sensorSupported);
   const setSensorSupported = useGameStore((s) => s.setSensorSupported);
   const sensorPermission = useGameStore((s) => s.sensorPermission);
@@ -193,6 +196,27 @@ export default function ControlsPanel() {
         <div className="shrink-0 rounded-lg bg-zinc-950/60 px-2.5 py-1.5 text-[11px] text-zinc-200">
           校准 {calibration.toFixed(2)}
         </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Button
+          onClick={() => {
+            setTrackId("track1");
+            reset();
+          }}
+          variant={trackId === "track1" ? "primary" : "ghost"}
+        >
+          赛道1
+        </Button>
+        <Button
+          onClick={() => {
+            setTrackId("track2");
+            reset();
+          }}
+          variant={trackId === "track2" ? "primary" : "ghost"}
+        >
+          赛道2（高难）
+        </Button>
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2">
