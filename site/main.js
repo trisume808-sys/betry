@@ -227,11 +227,12 @@ const drawPlayerSprite = (x, y, angleRad, sizePx, offroad, danger) => {
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.32;
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = "rgba(0,0,0,0)";
+  ctx.globalAlpha = 0.95;
+  ctx.shadowBlur = 22;
+  ctx.shadowColor = danger ? "rgba(248,113,113,0.55)" : "rgba(34,211,238,0.55)";
   ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
-  ctx.globalAlpha = 0.22;
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = danger ? "rgba(255,180,180,0.45)" : "rgba(244,114,182,0.45)";
   ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
   ctx.restore();
 
@@ -409,7 +410,7 @@ const touch = {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const dpr = () => Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+const dpr = () => Math.max(1, window.devicePixelRatio || 1);
 
 const resize = () => {
   const ratio = dpr();
@@ -862,7 +863,7 @@ const drawSky = (w, h) => {
 
   ctx.save();
   ctx.globalAlpha = 0.55;
-  for (let i = 0; i < 34; i += 1) {
+  for (let i = 0; i < 64; i += 1) {
     const x = (w * ((i * 53) % 257)) / 257;
     const y = (h * ((i * 97) % 233)) / 233;
     const tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.7));
@@ -879,8 +880,8 @@ const drawSky = (w, h) => {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.lineWidth = 1.25;
-  for (let i = 0; i < 14; i += 1) {
-    const tt = (i + shift) / 14;
+  for (let i = 0; i < 26; i += 1) {
+    const tt = (i + shift) / 26;
     const p = tt * tt;
     const y = lerp(horizonY + 6, h, p);
     const a = 0.02 + (1 - tt) * 0.11;
@@ -893,8 +894,8 @@ const drawSky = (w, h) => {
   }
   ctx.globalAlpha = 0.1;
   ctx.strokeStyle = "rgba(34,211,238,0.8)";
-  for (let i = 0; i <= 8; i += 1) {
-    const x = lerp(-w * 0.15, w * 1.15, i / 8);
+  for (let i = 0; i <= 14; i += 1) {
+    const x = lerp(-w * 0.15, w * 1.15, i / 14);
     ctx.beginPath();
     ctx.moveTo(w * 0.5, horizonY);
     ctx.lineTo(x, h);
@@ -903,57 +904,21 @@ const drawSky = (w, h) => {
   ctx.restore();
 };
 
-let fxCache = { w: 0, h: 0, scanPattern: null, vignette: null };
-
-const ensureFx = (w, h) => {
-  if (fxCache.w === w && fxCache.h === h && fxCache.scanPattern && fxCache.vignette) return;
-  fxCache.w = w;
-  fxCache.h = h;
-
-  const scan = document.createElement("canvas");
-  scan.width = 2;
-  scan.height = 6;
-  const sg = scan.getContext("2d");
-  if (sg) {
-    sg.clearRect(0, 0, scan.width, scan.height);
-    sg.fillStyle = "rgba(0,0,0,0.9)";
-    sg.fillRect(0, 0, scan.width, 1);
-  }
-  fxCache.scanPattern = ctx.createPattern(scan, "repeat");
-
-  const v = document.createElement("canvas");
-  v.width = w;
-  v.height = h;
-  const vg = v.getContext("2d");
-  if (vg) {
-    const grad = vg.createRadialGradient(
-      w * 0.5,
-      h * 0.55,
-      Math.min(w, h) * 0.2,
-      w * 0.5,
-      h * 0.55,
-      Math.max(w, h) * 0.72,
-    );
-    grad.addColorStop(0, "rgba(0,0,0,0)");
-    grad.addColorStop(1, "rgba(0,0,0,0.55)");
-    vg.fillStyle = grad;
-    vg.fillRect(0, 0, w, h);
-  }
-  fxCache.vignette = v;
-};
-
 const drawPostFx = (w, h) => {
-  ensureFx(w, h);
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
-  ctx.globalAlpha = 0.05;
-  if (fxCache.scanPattern) {
-    ctx.fillStyle = fxCache.scanPattern;
-    ctx.fillRect(0, 0, w, h);
-  }
+  ctx.globalAlpha = 0.06;
+  ctx.fillStyle = "rgba(0,0,0,0.9)";
+  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
   ctx.restore();
 
-  if (fxCache.vignette) ctx.drawImage(fxCache.vignette, 0, 0);
+  ctx.save();
+  const v = ctx.createRadialGradient(w * 0.5, h * 0.55, Math.min(w, h) * 0.2, w * 0.5, h * 0.55, Math.max(w, h) * 0.72);
+  v.addColorStop(0, "rgba(0,0,0,0)");
+  v.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
 };
 
 const drawFinishBand = (cx, roadHalf, y) => {
@@ -1052,13 +1017,16 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.35;
-  ctx.lineWidth = edgeW * 2.2;
+  ctx.globalAlpha = 0.75;
+  ctx.lineWidth = edgeW * 2.6;
+  ctx.shadowBlur = edgeW * 10;
+  ctx.shadowColor = leftEdge;
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
   for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
   ctx.strokeStyle = leftEdge;
   ctx.stroke();
+  ctx.shadowColor = rightEdge;
   ctx.beginPath();
   ctx.moveTo(right[0][0], right[0][1]);
   for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
