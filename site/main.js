@@ -38,7 +38,7 @@ const createHypercarSprite = ({ width = 56, height = 112, scale = 2 } = {}) => {
     glassTop: "rgba(55,105,140,0.45)",
     glassBottom: "rgba(10,20,28,0.86)",
     trim: "rgba(255,255,255,0.10)",
-    light: "rgba(160,220,255,0.85)",
+    light: "rgba(255,255,255,0.96)",
     shadow: "rgba(0,0,0,0.48)",
   };
 
@@ -146,22 +146,22 @@ const playerGlow = (() => {
   if (!g) return null;
 
   const cx = pad + playerSprite.w * 0.5;
-  const cy = pad + playerSprite.h * 0.205;
+  const cy = pad + playerSprite.h * 0.223;
   const dx = playerSprite.w * 0.22;
-  const rx = playerSprite.w * 0.09;
-  const ry = playerSprite.h * 0.055;
+  const rx = playerSprite.w * 0.10;
+  const ry = playerSprite.h * 0.06;
 
   g.save();
   g.globalCompositeOperation = "screen";
-  g.shadowColor = "rgba(200,230,255,0.75)";
-  g.shadowBlur = 22;
-  g.fillStyle = "rgba(160,220,255,0.85)";
+  g.shadowColor = "rgba(220,240,255,0.85)";
+  g.shadowBlur = 34;
+  g.fillStyle = "rgba(220,240,255,0.95)";
   g.beginPath();
   g.ellipse(cx - dx, cy, rx, ry, -0.55, 0, Math.PI * 2);
   g.ellipse(cx + dx, cy, rx, ry, 0.55, 0, Math.PI * 2);
   g.fill();
-  g.shadowBlur = 10;
-  g.fillStyle = "rgba(255,255,255,0.75)";
+  g.shadowBlur = 14;
+  g.fillStyle = "rgba(255,255,255,0.92)";
   g.beginPath();
   g.ellipse(cx - dx, cy, rx * 0.55, ry * 0.55, -0.55, 0, Math.PI * 2);
   g.ellipse(cx + dx, cy, rx * 0.55, ry * 0.55, 0.55, 0, Math.PI * 2);
@@ -177,6 +177,31 @@ const drawPlayerSprite = (x, y, angleRad, sizePx, offroad) => {
   ctx.translate(x, y);
   ctx.rotate(angleRad);
   ctx.scale(s, s);
+
+  const hx = playerSprite.w * 0.22;
+  const hy = -playerSprite.h * 0.277;
+  const beamLen = playerSprite.h * 0.95;
+  const beamW = playerSprite.w * 0.26;
+  const beam = ctx.createLinearGradient(0, hy, 0, hy - beamLen);
+  beam.addColorStop(0, "rgba(255,255,255,0.32)");
+  beam.addColorStop(0.25, "rgba(220,240,255,0.18)");
+  beam.addColorStop(1, "rgba(220,240,255,0)");
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = beam;
+  ctx.globalAlpha = 1;
+  for (const sx of [-hx, hx]) {
+    ctx.beginPath();
+    ctx.moveTo(sx - beamW * 0.26, hy + 2);
+    ctx.lineTo(sx + beamW * 0.26, hy + 2);
+    ctx.lineTo(sx + beamW, hy - beamLen);
+    ctx.lineTo(sx - beamW, hy - beamLen);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
   if (playerGlow) ctx.drawImage(playerGlow.canvas, -playerGlow.ax, -playerGlow.ay);
   ctx.shadowColor = "rgba(0,0,0,0.65)";
   ctx.shadowBlur = 8;
@@ -762,21 +787,21 @@ const drawSlider = (key, rect, value, min, max, label) => {
 
 const drawSky = (w, h) => {
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "#05060d");
-  g.addColorStop(0.55, "#070b14");
-  g.addColorStop(1, "#050508");
+  g.addColorStop(0, "#f3f4f6");
+  g.addColorStop(0.65, "#e5e7eb");
+  g.addColorStop(1, "#d1d5db");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
   ctx.save();
-  ctx.globalAlpha = 0.22;
-  for (let i = 0; i < 70; i += 1) {
+  ctx.globalAlpha = 0.18;
+  for (let i = 0; i < 36; i += 1) {
     const x = (w * (i * 37 % 97)) / 97;
     const y = (h * (i * 19 % 83)) / 83;
     const r = 1 + ((i * 13) % 4);
-    ctx.fillStyle = i % 11 === 0 ? "rgba(244,114,182,0.9)" : "rgba(226,232,240,0.88)";
+    ctx.fillStyle = "rgba(148,163,184,0.55)";
     ctx.beginPath();
-    ctx.arc(x, y * 0.55, r, 0, Math.PI * 2);
+    ctx.arc(x, y * 0.4, r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -832,12 +857,12 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   }
 
   ctx.save();
-  ctx.fillStyle = "rgba(6,8,14,0.92)";
+  ctx.fillStyle = "rgba(229,231,235,0.95)";
   ctx.fillRect(0, y0, w, y1 - y0);
 
   const asphalt = ctx.createLinearGradient(0, y0, 0, y1);
-  asphalt.addColorStop(0, "rgba(12,18,30,0.86)");
-  asphalt.addColorStop(1, "rgba(6,8,14,0.94)");
+  asphalt.addColorStop(0, "rgba(156,163,175,0.92)");
+  asphalt.addColorStop(1, "rgba(107,114,128,0.95)");
 
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
@@ -851,8 +876,8 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.clip();
   const highlight = ctx.createLinearGradient(spanL, 0, spanR, 0);
   highlight.addColorStop(0, "rgba(255,255,255,0)");
-  highlight.addColorStop(0.46, "rgba(255,255,255,0.10)");
-  highlight.addColorStop(0.54, "rgba(255,255,255,0.06)");
+  highlight.addColorStop(0.46, "rgba(255,255,255,0.14)");
+  highlight.addColorStop(0.54, "rgba(255,255,255,0.10)");
   highlight.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = highlight;
   ctx.fillRect(spanL, y0, spanR - spanL, y1 - y0);
@@ -865,22 +890,22 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
   for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
-  ctx.strokeStyle = "rgba(34,211,238,0.52)";
+  ctx.strokeStyle = "rgba(248,250,252,0.85)";
   ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(right[0][0], right[0][1]);
   for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.strokeStyle = "rgba(244,114,182,0.44)";
+  ctx.strokeStyle = "rgba(248,250,252,0.85)";
   ctx.stroke();
 
   ctx.lineWidth = edgeW * 2.4;
   ctx.globalAlpha = 0.22;
-  ctx.strokeStyle = "rgba(34,211,238,0.60)";
+  ctx.strokeStyle = "rgba(148,163,184,0.55)";
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
   for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(244,114,182,0.50)";
+  ctx.strokeStyle = "rgba(148,163,184,0.55)";
   ctx.beginPath();
   ctx.moveTo(right[0][0], right[0][1]);
   for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
@@ -892,8 +917,8 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   const stripeGap = 18;
   const stripePeriod = stripeH + stripeGap;
   const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
-  ctx.globalAlpha = 0.28;
-  ctx.fillStyle = "rgba(226,232,240,0.9)";
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = "rgba(248,250,252,0.95)";
   for (let y = y1 + stripeShift; y > y0 - stripePeriod; y -= stripePeriod) {
     const yy = y;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
@@ -930,14 +955,14 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   
   ctx.save();
   ctx.globalAlpha = 0.85;
-  ctx.strokeStyle = "rgba(244,244,245,0.18)";
+  ctx.strokeStyle = "rgba(15,23,42,0.12)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(carMarkerX, carMarkerY - 40);
   ctx.lineTo(carMarkerX, carMarkerY + 12);
   ctx.stroke();
   ctx.globalAlpha = 1;
-  const sizePx = clamp(Math.min(w, h) * 0.07, 30, 54);
+  const sizePx = clamp(Math.min(w, h) * 0.11, 46, 88);
   drawPlayerSprite(carMarkerX, carMarkerY - 14, heading, sizePx, state.offroad);
   ctx.restore();
 
@@ -985,10 +1010,10 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const mapY = (t) => y0 + inset + t * sy;
 
   ctx.save();
-  ctx.fillStyle = "rgba(10,10,18,0.62)";
+  ctx.fillStyle = "rgba(15,23,42,0.62)";
   drawRoundRect(x0, y0, mapW, mapH, 14);
   ctx.fill();
-  ctx.strokeStyle = "rgba(34,211,238,0.32)";
+  ctx.strokeStyle = "rgba(226,232,240,0.20)";
   ctx.lineWidth = 1.5;
   drawRoundRect(x0 + 0.75, y0 + 0.75, mapW - 1.5, mapH - 1.5, 13);
   ctx.stroke();
@@ -1017,7 +1042,7 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const carT = clamp(distance / fd, 0, 1);
   const carPx = mapX(carX);
   const carPy = mapY(carT);
-  const icon = clamp(mapW * 0.085, 10, 16);
+  const icon = clamp(mapW * 0.11, 14, 22);
   drawPlayerSprite(carPx, carPy, Math.PI + heading, icon, offroad);
   ctx.restore();
 };
@@ -1029,13 +1054,13 @@ const drawCockpit = (w, h, offroad) => {
   ctx.save();
   const rg = ctx.createLinearGradient(0, y0, 0, h);
   rg.addColorStop(0, "rgba(0,0,0,0)");
-  rg.addColorStop(0.15, "rgba(0,0,0,0.65)");
-  rg.addColorStop(1, "rgba(0,0,0,0.92)");
+  rg.addColorStop(0.15, "rgba(15,23,42,0.55)");
+  rg.addColorStop(1, "rgba(15,23,42,0.82)");
   ctx.fillStyle = rg;
   ctx.fillRect(0, y0, w, cockpitH);
 
   const dashY = h - cockpitH * 0.76;
-  ctx.fillStyle = "rgba(10,10,18,0.62)";
+  ctx.fillStyle = "rgba(15,23,42,0.62)";
   drawRoundRect(w * 0.06, dashY, w * 0.88, cockpitH * 0.48, 22);
   ctx.fill();
 
@@ -1047,7 +1072,7 @@ const drawCockpit = (w, h, offroad) => {
   ctx.beginPath();
   ctx.arc(wx, wy, wheelR, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = offroad ? "rgba(248,113,113,0.65)" : "rgba(34,211,238,0.55)";
+  ctx.strokeStyle = offroad ? "rgba(248,113,113,0.65)" : "rgba(15,23,42,0.32)";
   ctx.beginPath();
   ctx.arc(wx, wy, wheelR * 0.66, -Math.PI * 0.15, Math.PI * 1.15);
   ctx.stroke();
@@ -1064,7 +1089,7 @@ const drawCockpit = (w, h, offroad) => {
   ctx.stroke();
   ctx.restore();
 
-  const light = offroad ? "rgba(248,113,113,0.85)" : "rgba(34,211,238,0.85)";
+  const light = offroad ? "rgba(248,113,113,0.85)" : "rgba(15,23,42,0.65)";
   ctx.fillStyle = light;
   drawRoundRect(w * 0.08, dashY + 14, w * 0.18, 10, 6);
   ctx.fill();
