@@ -399,7 +399,24 @@ const touch = {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const dpr = () => Math.max(1, window.devicePixelRatio || 1);
+const dpr = () => {
+  const raw = Math.max(1, window.devicePixelRatio || 1);
+  const mem = typeof navigator !== "undefined" ? navigator.deviceMemory : undefined;
+  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency : undefined;
+  const max =
+    typeof mem === "number" && mem <= 4 ? 1 : typeof cores === "number" && cores <= 4 ? 1 : 1.25;
+  return Math.min(raw, max);
+};
+
+const perf = {
+  frame: 0,
+  renderEvery:
+    (typeof navigator !== "undefined" &&
+      ((typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4) ||
+        (typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4)))
+      ? 2
+      : 1,
+};
 
 const resize = () => {
   const ratio = dpr();
@@ -900,7 +917,7 @@ const drawFinishBand = (cx, roadHalf, y) => {
 const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y0 = h * VIEW_Y0_T;
   const y1 = h * VIEW_Y1_T;
-  const steps = 46;
+  const steps = 34;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const elevScale = Math.min(0.11, h * 0.00018);
@@ -972,7 +989,7 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
 
   const stripeH = 26;
   const stripeW = 6;
-  const stripeGap = 18;
+  const stripeGap = 26;
   const stripePeriod = stripeH + stripeGap;
   const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
   ctx.globalAlpha = danger ? 0.55 : 0.42;
@@ -1043,28 +1060,33 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading, danger) => {
   const inset = 12;
   const fd = getTrack().finishDistance;
 
-  const steps = 160;
-  const ptsL = [];
-  const ptsR = [];
-  let minX = Infinity;
-  let maxX = -Infinity;
-
-  for (let i = 0; i <= steps; i += 1) {
-    const t = i / steps;
-    const yWorld = t * fd;
-    const c = centerX(yWorld);
-    const hw = halfWidth(yWorld);
-    minX = Math.min(minX, c - hw);
-    maxX = Math.max(maxX, c + hw);
-    ptsL.push([c - hw, t]);
-    ptsR.push([c + hw, t]);
+  if (!drawMiniMap.cache || drawMiniMap.cache.trackId !== state.trackId) {
+    const steps = 96;
+    const ptsL = [];
+    const ptsR = [];
+    let minX = Infinity;
+    let maxX = -Infinity;
+    for (let i = 0; i <= steps; i += 1) {
+      const t = i / steps;
+      const yWorld = t * fd;
+      const c = centerX(yWorld);
+      const hw = halfWidth(yWorld);
+      minX = Math.min(minX, c - hw);
+      maxX = Math.max(maxX, c + hw);
+      ptsL.push([c - hw, t]);
+      ptsR.push([c + hw, t]);
+    }
+    drawMiniMap.cache = { trackId: state.trackId, ptsL, ptsR, minX, maxX };
   }
 
-  const spanX = Math.max(1, maxX - minX);
+  const cache = drawMiniMap.cache;
+  const ptsL = cache.ptsL;
+  const ptsR = cache.ptsR;
+  const spanX = Math.max(1, cache.maxX - cache.minX);
   const sx = (mapW - inset * 2) / spanX;
   const sy = mapH - inset * 2;
 
-  const mapX = (x) => x0 + inset + (x - minX) * sx;
+  const mapX = (x) => x0 + inset + (x - cache.minX) * sx;
   const mapY = (t) => y0 + inset + t * sy;
 
   ctx.save();
@@ -1534,7 +1556,8 @@ const updateSim = (t) => {
   state.penalty = Math.max(0, Math.floor(state.penalty));
   state.score = calcScore(state.finishMs ?? state.elapsedMs, state.penalty);
 
-  drawFrame(w, h);
+  perf.frame += 1;
+  if (perf.frame % perf.renderEvery === 0) drawFrame(w, h);
 };
 
 const drawFrame = (w, h) => {
