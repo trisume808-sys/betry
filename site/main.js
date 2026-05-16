@@ -145,17 +145,27 @@ const playerGlow = (() => {
   const g = canvas.getContext("2d");
   if (!g) return null;
 
-  const x = pad - playerSprite.ax;
-  const y = pad - playerSprite.ay;
+  const cx = pad + playerSprite.w * 0.5;
+  const cy = pad + playerSprite.h * 0.205;
+  const dx = playerSprite.w * 0.22;
+  const rx = playerSprite.w * 0.09;
+  const ry = playerSprite.h * 0.055;
 
   g.save();
   g.globalCompositeOperation = "screen";
-  g.shadowColor = "rgba(34,211,238,0.55)";
-  g.shadowBlur = 18;
-  g.drawImage(playerSprite.canvas, x, y);
-  g.shadowColor = "rgba(244,114,182,0.40)";
-  g.shadowBlur = 14;
-  g.drawImage(playerSprite.canvas, x, y);
+  g.shadowColor = "rgba(200,230,255,0.75)";
+  g.shadowBlur = 22;
+  g.fillStyle = "rgba(160,220,255,0.85)";
+  g.beginPath();
+  g.ellipse(cx - dx, cy, rx, ry, -0.55, 0, Math.PI * 2);
+  g.ellipse(cx + dx, cy, rx, ry, 0.55, 0, Math.PI * 2);
+  g.fill();
+  g.shadowBlur = 10;
+  g.fillStyle = "rgba(255,255,255,0.75)";
+  g.beginPath();
+  g.ellipse(cx - dx, cy, rx * 0.55, ry * 0.55, -0.55, 0, Math.PI * 2);
+  g.ellipse(cx + dx, cy, rx * 0.55, ry * 0.55, 0.55, 0, Math.PI * 2);
+  g.fill();
   g.restore();
 
   return { canvas, ax: playerSprite.ax + pad, ay: playerSprite.ay + pad };
