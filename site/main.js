@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-11";
+const BUILD_ID = "20260516-13";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -826,7 +826,7 @@ const drawTopHud = (w, h) => {
   ctx.save();
   ctx.fillStyle = "rgba(10,10,18,0.62)";
   const boxW = Math.min(w * 0.42, 270);
-  drawRoundRect(pad, pad, boxW, 72, 16);
+  drawRoundRect(pad, pad, boxW, 92, 16);
   ctx.fill();
   ctx.fillStyle = "rgba(244,244,245,0.92)";
   ctx.font = `${Math.max(12, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
@@ -837,6 +837,8 @@ const drawTopHud = (w, h) => {
   ctx.font = `${Math.max(10, Math.floor(w * 0.016))}px ui-sans-serif, system-ui`;
   ctx.fillText(`build ${state.build}`, pad + 12, pad + 42);
   ctx.fillText(`len ${finishDistance} / bends ${track.bends.length}`, pad + 12, pad + 60);
+  ctx.fillStyle = "rgba(52,211,153,0.9)";
+  ctx.fillText(`score ${state.score}  penalty ${state.penalty}`, pad + 12, pad + 80);
   ctx.restore();
 };
 
@@ -1085,6 +1087,22 @@ const drawFrame = (w, h) => {
   drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
+  if (state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs) {
+    const k = clamp((sim.penaltyFlashUntil - sim.elapsedMs) / 520, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = 0.25 + 0.55 * k;
+    ctx.fillStyle = "rgba(248,113,113,0.55)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = "rgba(248,113,113,0.98)";
+    ctx.font = `${Math.max(26, Math.floor(w * 0.06))}px ui-sans-serif, system-ui`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`-${sim.lastPenaltyDelta}`, w * 0.5, h * 0.42);
+    ctx.restore();
+  }
+  if (state.status === "running") drawRunUi(w, h);
+  else drawSetupUi(w, h);
   if (state.status !== "running" && state.finishMs != null) {
     ctx.save();
     ctx.globalAlpha = 0.75;
@@ -1106,22 +1124,6 @@ const drawFrame = (w, h) => {
     ctx.fillText(`用时 ${formatMs(state.finishMs)}   扣分 ${state.penalty}`, w * 0.5, by + bh * 0.78);
     ctx.restore();
   }
-  if (state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs) {
-    const k = clamp((sim.penaltyFlashUntil - sim.elapsedMs) / 520, 0, 1);
-    ctx.save();
-    ctx.globalAlpha = 0.25 + 0.55 * k;
-    ctx.fillStyle = "rgba(248,113,113,0.55)";
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = "rgba(248,113,113,0.98)";
-    ctx.font = `${Math.max(26, Math.floor(w * 0.06))}px ui-sans-serif, system-ui`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`-${sim.lastPenaltyDelta}`, w * 0.5, h * 0.42);
-    ctx.restore();
-  }
-  if (state.status === "running") drawRunUi(w, h);
-  else drawSetupUi(w, h);
 };
 
 const loop = (t) => {
