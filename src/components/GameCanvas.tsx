@@ -391,133 +391,6 @@ function drawRoadFlat(
   ctx.restore();
 }
 
-function drawRoadPerspective(
-  ctx: CanvasRenderingContext2D,
-  params: {
-    w: number;
-    h: number;
-    carX: number;
-    distance: number;
-    finishDistance: number;
-  },
-) {
-  const { w, h, carX, distance, finishDistance } = params;
-  const horizonY = h * 0.18;
-  const nearY = h * 0.92;
-  const segCount = 46;
-  const lookahead = 1500;
-  const curveScale = 1.05;
-  const depthPow = 1.85;
-
-  type Seg = {
-    y: number;
-    cx: number;
-    lx: number;
-    rx: number;
-    z: number;
-    yWorld: number;
-  };
-
-  const segs: Seg[] = [];
-  for (let i = 0; i <= segCount; i += 1) {
-    const t = i / segCount;
-    const z = Math.pow(t, depthPow);
-    const yWorld = distance + z * lookahead;
-    const c = centerX(yWorld) - carX;
-    const hw = halfWidth(yWorld);
-    const scale = (1 - t) * (1 - t) * 0.94 + 0.06;
-    const cx = w / 2 + c * scale * curveScale;
-    const roadHalf = hw * scale * curveScale;
-    const y = lerp(nearY, horizonY, z);
-    segs.push({
-      y,
-      cx,
-      lx: cx - roadHalf,
-      rx: cx + roadHalf,
-      z,
-      yWorld,
-    });
-  }
-
-  ctx.save();
-  ctx.globalAlpha = 1;
-
-  for (let i = 0; i < segCount; i += 1) {
-    const a = segs[i];
-    const b = segs[i + 1];
-    const stripe = i % 2 === 0;
-
-    ctx.beginPath();
-    ctx.moveTo(a.lx, a.y);
-    ctx.lineTo(a.rx, a.y);
-    ctx.lineTo(b.rx, b.y);
-    ctx.lineTo(b.lx, b.y);
-    ctx.closePath();
-    ctx.fillStyle = stripe ? "#14141b" : "#101017";
-    ctx.fill();
-
-    const shoulder = 0.12;
-    ctx.beginPath();
-    ctx.moveTo(lerp(a.lx, a.rx, -shoulder), a.y);
-    ctx.lineTo(a.lx, a.y);
-    ctx.lineTo(b.lx, b.y);
-    ctx.lineTo(lerp(b.lx, b.rx, -shoulder), b.y);
-    ctx.closePath();
-    ctx.fillStyle = stripe ? "#0f172a" : "#111827";
-    ctx.globalAlpha = 0.55;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(a.rx, a.y);
-    ctx.lineTo(lerp(a.lx, a.rx, 1 + shoulder), a.y);
-    ctx.lineTo(lerp(b.lx, b.rx, 1 + shoulder), b.y);
-    ctx.lineTo(b.rx, b.y);
-    ctx.closePath();
-    ctx.fillStyle = stripe ? "#0f172a" : "#111827";
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    const midA = a.cx;
-    const midB = b.cx;
-    const dash = (Math.floor((distance * 0.03 + i) % 6) < 3);
-    if (dash) {
-      const laneW = (a.rx - a.lx) * 0.02;
-      ctx.beginPath();
-      ctx.moveTo(midA - laneW, a.y);
-      ctx.lineTo(midA + laneW, a.y);
-      ctx.lineTo(midB + laneW, b.y);
-      ctx.lineTo(midB - laneW, b.y);
-      ctx.closePath();
-      ctx.fillStyle = "#e5e7eb";
-      ctx.globalAlpha = 0.42;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  const finishZ = (finishDistance - distance) / lookahead;
-  if (finishZ > 0 && finishZ < 1) {
-    const t = Math.pow(finishZ, 1 / depthPow);
-    const z = Math.pow(t, depthPow);
-    const yWorld = finishDistance;
-    const c = centerX(yWorld) - carX;
-    const hw = halfWidth(yWorld);
-    const scale = (1 - t) * (1 - t) * 0.94 + 0.06;
-    const cx = w / 2 + c * scale * curveScale;
-    const roadHalf = hw * scale * curveScale;
-    const y = lerp(nearY, horizonY, z);
-    drawFinishBand(ctx, { cx, roadHalf, y, w });
-  }
-
-  const vignette = ctx.createRadialGradient(w / 2, h * 0.62, h * 0.1, w / 2, h * 0.62, Math.max(w, h) * 0.95);
-  vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.55)");
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, w, h);
-
-  ctx.restore();
-}
-
 function drawFinishBand(
   ctx: CanvasRenderingContext2D,
   params: { cx: number; roadHalf: number; y: number; w: number },
@@ -556,7 +429,7 @@ function drawMiniMap(
     offroad: boolean;
   },
 ) {
-  const { w, h, carX, distance, finishDistance, offroad } = params;
+  const { w, carX, distance, finishDistance, offroad } = params;
   const pad = 14;
   const mapW = Math.min(w * 0.34, 260);
   const mapH = mapW * 0.72;

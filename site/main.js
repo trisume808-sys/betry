@@ -11,6 +11,8 @@ const state = {
   sensorEnabled: false,
   sensorSupported: true,
   sensitivity: 3.2,
+  steerStrength: 2.4,
+  returnRate: 7.5,
   calibration: 0,
   tiltRaw: 0,
   tilt: 0,
@@ -27,13 +29,16 @@ const ui = {
   rects: new Map(),
   pointerDown: null,
   sliderActive: false,
+  sliderKey: null,
 };
 
 const sim = {
   x: 0,
+  heading: 0,
   distance: 0,
   elapsedMs: 0,
   steerSmooth: 0,
+  steerAngle: 0,
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -169,6 +174,7 @@ const resetRun = () => {
   state.offroad = false;
   state.tiltSmooth = 0;
   sim.x = 0;
+  sim.heading = 0;
   sim.distance = 0;
   sim.elapsedMs = 0;
   sim.steerSmooth = 0;
@@ -273,11 +279,14 @@ const onPointerDown = (e) => {
     return;
   }
 
-  const sl = ui.rects.get("sensitivity");
-  if (sl && hit(p.x, p.y, sl)) {
-    ui.sliderActive = true;
-    setSensitivityByX(p.x, sl);
-    return;
+  for (const key of ["sensitivity", "steerStrength", "returnRate"]) {
+    const sl = ui.rects.get(key);
+    if (sl && hit(p.x, p.y, sl)) {
+      ui.sliderActive = true;
+      ui.sliderKey = key;
+      setSliderByX(key, p.x, sl);
+      return;
+    }
   }
 
   for (const key of ["enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
@@ -303,14 +312,17 @@ const onPointerMove = (e) => {
   }
 
   if (!ui.sliderActive) return;
-  const sl = ui.rects.get("sensitivity");
+  const key = ui.sliderKey;
+  if (!key) return;
+  const sl = ui.rects.get(key);
   if (!sl) return;
-  setSensitivityByX(p.x, sl);
+  setSliderByX(key, p.x, sl);
 };
 
 const onPointerUp = () => {
   ui.pointerDown = null;
   ui.sliderActive = false;
+  ui.sliderKey = null;
   touch.active = false;
   touch.steer = 0;
 };
@@ -320,9 +332,11 @@ canvas.addEventListener("pointermove", onPointerMove);
 canvas.addEventListener("pointerup", onPointerUp);
 canvas.addEventListener("pointercancel", onPointerUp);
 
-const setSensitivityByX = (x, rect) => {
+const setSliderByX = (key, x, rect) => {
   const t = clamp((x - rect.x) / rect.w, 0, 1);
-  state.sensitivity = 0.6 + t * (8 - 0.6);
+  if (key === "sensitivity") state.sensitivity = 0.6 + t * (8 - 0.6);
+  if (key === "steerStrength") state.steerStrength = 0.8 + t * (4.2 - 0.8);
+  if (key === "returnRate") state.returnRate = 2 + t * (14 - 2);
 };
 
 const handleButton = (key) => {
@@ -371,7 +385,7 @@ const drawButton = (key, label, rect, variant) => {
   ctx.restore();
 };
 
-const drawSlider = (key, rect, value, min, max) => {
+const drawSlider = (key, rect, value, min, max, label) => {
   ui.rects.set(key, rect);
   const t = clamp((value - min) / (max - min), 0, 1);
   ctx.save();
@@ -387,7 +401,7 @@ const drawSlider = (key, rect, value, min, max) => {
   ctx.font = `${Math.floor(rect.h * 0.62)}px ui-sans-serif, system-ui`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(`灵敏度 ${value.toFixed(2)}`, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.fillText(`${label} ${value.toFixed(2)}`, rect.x + rect.w / 2, rect.y + rect.h / 2);
   ctx.restore();
 };
 
@@ -434,13 +448,14 @@ const drawFinishBand = (cx, roadHalf, y) => {
   ctx.restore();
 };
 
-const drawRoadFlat = (w, h, carX, distance) => {
+const drawRoadFlat = (w, h, carX, distance, heading) => {
   const y0 = h * 0.16;
   const y1 = h * 0.9;
   const steps = 56;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const curveScale = 0.22;
+  const viewCarX = carX + heading * 210;
 
   const left = [];
   const right = [];
@@ -448,7 +463,7 @@ const drawRoadFlat = (w, h, carX, distance) => {
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
     const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
+    const c = centerX(yWorld) - viewCarX;
     const cx = w / 2 + c * curveScale;
     const y = lerp(y1, y0, t);
     left.push([cx - roadHalfPx, y]);
@@ -488,7 +503,7 @@ const drawRoadFlat = (w, h, carX, distance) => {
     const yy = y + dy;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
     const yWorld = distance + t * lookahead;
-    const c = centerX(yWorld) - carX;
+    const c = centerX(yWorld) - viewCarX;
     const cx = w / 2 + c * curveScale;
     drawRoundRect(cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
@@ -499,7 +514,7 @@ const drawRoadFlat = (w, h, carX, distance) => {
   if (finishT > 0 && finishT < 1) {
     const y = lerp(y1, y0, finishT);
     const yWorld = finishDistance;
-    const c = centerX(yWorld) - carX;
+    const c = centerX(yWorld) - viewCarX;
     const cx = w / 2 + c * curveScale;
     drawFinishBand(cx, roadHalfPx, y);
   }
@@ -513,7 +528,7 @@ const drawRoadFlat = (w, h, carX, distance) => {
   ctx.restore();
 };
 
-const drawMiniMap = (w, h, carX, distance, offroad) => {
+const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const pad = 14;
   const mapW = Math.min(w * 0.34, 260);
   const mapH = mapW * 0.72;
@@ -573,10 +588,17 @@ const drawMiniMap = (w, h, carX, distance, offroad) => {
   }
 
   const carY = y1 - ((distance - start) / (end - start)) * mapH;
-  ctx.fillStyle = offroad ? "rgba(248,113,113,0.9)" : "rgba(52,211,153,0.9)";
+  ctx.save();
+  ctx.translate(cx, carY);
+  ctx.rotate(heading);
+  ctx.fillStyle = offroad ? "rgba(248,113,113,0.95)" : "rgba(52,211,153,0.95)";
   ctx.beginPath();
-  ctx.arc(cx, carY, 5, 0, Math.PI * 2);
+  ctx.moveTo(0, -8);
+  ctx.lineTo(6, 8);
+  ctx.lineTo(-6, 8);
+  ctx.closePath();
   ctx.fill();
+  ctx.restore();
   ctx.restore();
 };
 
@@ -609,6 +631,18 @@ const drawCockpit = (w, h, offroad) => {
   ctx.beginPath();
   ctx.arc(wx, wy, wheelR * 0.66, -Math.PI * 0.15, Math.PI * 1.15);
   ctx.stroke();
+
+  const steerAngle = clamp(sim.steerAngle * 2.2, -1.35, 1.35);
+  ctx.save();
+  ctx.translate(wx, wy);
+  ctx.rotate(steerAngle);
+  ctx.strokeStyle = "rgba(244,244,245,0.65)";
+  ctx.lineWidth = Math.max(3, Math.floor(wheelR * 0.08));
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -wheelR * 0.72);
+  ctx.stroke();
+  ctx.restore();
 
   const light = offroad ? "rgba(248,113,113,0.85)" : "rgba(52,211,153,0.85)";
   ctx.fillStyle = light;
@@ -677,7 +711,23 @@ const drawSetupUi = (w, h) => {
 
   const sliderY = rowY + (btnH + gap) * 3 + 4;
   const sliderH = Math.max(34, Math.floor(h * 0.045));
-  drawSlider("sensitivity", { x: x0 + 14, y: sliderY, w: panelW - 28, h: sliderH }, state.sensitivity, 0.6, 8);
+  drawSlider("sensitivity", { x: x0 + 14, y: sliderY, w: panelW - 28, h: sliderH }, state.sensitivity, 0.6, 8, "灵敏度");
+  drawSlider(
+    "steerStrength",
+    { x: x0 + 14, y: sliderY + sliderH + 10, w: panelW - 28, h: sliderH },
+    state.steerStrength,
+    0.8,
+    4.2,
+    "转向强度",
+  );
+  drawSlider(
+    "returnRate",
+    { x: x0 + 14, y: sliderY + (sliderH + 10) * 2, w: panelW - 28, h: sliderH },
+    state.returnRate,
+    2,
+    14,
+    "回正速度",
+  );
 
   ctx.fillStyle = "rgba(161,161,170,0.95)";
   ctx.font = `${Math.max(10, Math.floor(w * 0.016))}px ui-sans-serif, system-ui`;
@@ -692,8 +742,9 @@ const drawSetupUi = (w, h) => {
             ? "传感器已启用：先校准，再开始"
             : "传感器已启用但未收到数据：建议用 Chrome/Edge，并允许“运动与传感器”"
           : "未启用传感器";
-  ctx.fillText(t1, x0 + 14, sliderY + sliderH + 20);
-  ctx.fillText(t2, x0 + 14, sliderY + sliderH + 40);
+  const infoY = sliderY + (sliderH + 10) * 3 + 12;
+  ctx.fillText(t1, x0 + 14, infoY + 16);
+  ctx.fillText(t2, x0 + 14, infoY + 36);
   ctx.restore();
 };
 
@@ -734,24 +785,34 @@ const updateSim = (t) => {
 
   const steerTarget = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : tilt;
   const follow = 1 - Math.pow(0.001, dt);
-  sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.18);
+  sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.32);
   state.tiltSmooth = sim.steerSmooth;
 
   const baseSpeed = 260;
-  const y = sim.distance;
-  const c = centerX(y);
-  const hw = halfWidth(y);
   const carHalf = 12;
-  const offroad = Math.abs(sim.x - c) > hw - carHalf;
-  const speed = baseSpeed * (offroad ? 0.55 : 1);
+  const y0 = sim.distance;
+  const c0 = centerX(y0);
+  const hw0 = halfWidth(y0);
+  const offroad0 = Math.abs(sim.x - c0) > hw0 - carHalf;
+  const speed0 = baseSpeed * (offroad0 ? 0.55 : 1);
 
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
-    sim.distance += speed * dt;
+    const neutral = !touch.active && Math.abs(steerTarget) < 0.02;
+    const steerInput = clamp(sim.steerSmooth * state.sensitivity, -1, 1);
+    const maxSteerRad = 0.78;
+    const targetSteerAngle = neutral ? 0 : steerInput * maxSteerRad;
+    const rate = neutral ? state.returnRate : 10.5;
+    sim.steerAngle += clamp(targetSteerAngle - sim.steerAngle, -rate * dt, rate * dt);
 
-    const steer = sim.steerSmooth * state.sensitivity;
-    sim.x += steer * speed * dt * 0.85;
-    if (!touch.active && Math.abs(steerTarget) < 0.02) sim.x *= Math.pow(0.92, dtMs / 16.7);
+    const wheelBase = 185;
+    const yawRate = (speed0 / wheelBase) * Math.tan(sim.steerAngle) * state.steerStrength;
+    sim.heading += yawRate * dt;
+    sim.heading = clamp(sim.heading, -1.25, 1.25);
+    sim.heading *= Math.exp(-0.22 * dt);
+
+    sim.distance += speed0 * Math.cos(sim.heading) * dt;
+    sim.x += speed0 * Math.sin(sim.heading) * dt;
 
     const ny = sim.distance;
     const nc = centerX(ny);
@@ -765,6 +826,12 @@ const updateSim = (t) => {
     }
   }
 
+  const y1 = sim.distance;
+  const c1 = centerX(y1);
+  const hw1 = halfWidth(y1);
+  const offroad = Math.abs(sim.x - c1) > hw1 - carHalf;
+  const speed = baseSpeed * (offroad ? 0.55 : 1);
+
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
   state.speed = speed;
@@ -776,8 +843,8 @@ const updateSim = (t) => {
 const drawFrame = (w, h) => {
   ctx.clearRect(0, 0, w, h);
   drawSky(w, h);
-  drawRoadFlat(w, h, sim.x, sim.distance);
-  drawMiniMap(w, h, sim.x, sim.distance, state.offroad);
+  drawRoadFlat(w, h, sim.x, sim.distance, sim.heading);
+  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, sim.heading);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
@@ -790,4 +857,3 @@ const loop = (t) => {
 };
 
 requestAnimationFrame(loop);
-
