@@ -45,10 +45,6 @@
         user-select: none;
       }
 
-      .link.topdown {
-        right: 12px;
-      }
-
       .link.tutorial {
         left: 12px;
         right: auto;
@@ -156,45 +152,36 @@
   </head>
   <body>
     <button class="link tutorial" id="tutorialOpen" type="button">教程</button>
-    <a class="link topdown" href="./topdown.html">俯视超跑</a>
     <div id="tutorialOverlay" hidden>
       <button id="tutorialBackdrop" type="button" aria-label="关闭教程"></button>
       <div id="tutorialPanel" role="dialog" aria-modal="true">
         <div id="tutorialHeader">
           <div>
             <div id="tutorialTitle">游戏教程</div>
-            <div id="tutorialSub">目标、界面含义，以及控制/驱动逻辑切换说明</div>
+            <div id="tutorialSub">看完就会玩的超简版</div>
           </div>
           <button id="tutorialClose" type="button">关闭</button>
         </div>
         <div class="tutorialSection">
-          <div class="tutorialH">目标</div>
+          <div class="tutorialH">怎么玩</div>
           <ul class="tutorialUl">
-            <li>从起点跑到终点线，尽量用更短时间完成。</li>
-            <li>偏离道路会降速，尽量把车保持在赛道内。</li>
+            <li>倾斜手机像方向盘一样转向。</li>
+            <li>按住画面左右拖动：临时用手指转向（适合传感器不好用时兜底）。</li>
+            <li>尽量别出赛道，出赛道会变慢。</li>
           </ul>
         </div>
         <div class="tutorialSection">
-          <div class="tutorialH">界面说明</div>
+          <div class="tutorialH">没反应怎么办</div>
           <ul class="tutorialUl">
-            <li>右上角：俯视超跑入口；教程入口。</li>
-            <li>按住画面左右拖动可临时接管转向。</li>
+            <li>先试试“按住画面左右拖动”，确认游戏能动。</li>
+            <li>如果要用传感器：用支持的浏览器打开，并在站点权限里允许“运动与传感器”。</li>
           </ul>
-        </div>
-        <div class="tutorialSection">
-          <div class="tutorialH">控制与驱动逻辑（重点）</div>
-          <div class="tutorialP">这个版本的转向输入有两条“驱动”来源：传感器倾斜与触控拖动。</div>
-          <div class="tutorialP">1) 传感器驱动：允许“运动与传感器”后，倾斜手机像方向盘一样转向。</div>
-          <div class="tutorialP">2) 触控接管：按住画面左右拖动即可接管转向。</div>
-          <div class="tutorialP">
-            3) 切换规则：当你开始拖动时会优先使用触控输入；停止拖动后又会回到传感器输入（如果浏览器已授权并能读到数据）。
-          </div>
         </div>
         <div class="tutorialSection">
           <div class="tutorialH">小技巧</div>
           <ul class="tutorialUl">
-            <li>iOS 需要用支持传感器的浏览器，并允许“运动与传感器”。</li>
-            <li>如果一直没反应，先试试触控拖动确认游戏正常运行。</li>
+            <li>手机竖屏更稳。</li>
+            <li>想“回正”：把手机摆正后再继续倾斜。</li>
           </ul>
         </div>
       </div>
