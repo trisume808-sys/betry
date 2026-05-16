@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#050508" />
+    <title>UI Preview - 霓虹夜景</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #050508;
+        color: #e4e4e7;
+        overflow: hidden;
+        touch-action: none;
+        font-family: ui-sans-serif, system-ui;
+      }
+      #wrap {
+        position: fixed;
+        inset: 0;
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .top {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        pointer-events: none;
+        user-select: none;
+      }
+      .badge {
+        pointer-events: none;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(10, 10, 18, 0.62);
+        backdrop-filter: blur(10px);
+        font-size: 12px;
+        line-height: 1.25;
+      }
+      .badge strong {
+        display: block;
+        font-weight: 700;
+        color: rgba(167, 243, 208, 0.95);
+        margin-bottom: 2px;
+      }
+      .back {
+        pointer-events: auto;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(10, 10, 18, 0.62);
+        color: rgba(52, 211, 153, 0.95);
+        text-decoration: none;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <div class="badge">
+        <strong>霓虹夜景</strong>
+        深蓝底 + 霓虹边线 + 高对比 HUD（黑车依然清晰）
+      </div>
+      <a class="back" href="./index.html">返回游戏</a>
+    </div>
+    <div id="wrap">
+      <canvas id="c"></canvas>
+    </div>
+    <script type="module" src="./preview-neon.js?v=20260517-1"></script>
+  </body>
+</html>
+
