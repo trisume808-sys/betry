@@ -819,9 +819,9 @@ const updateSim = (t) => {
 
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
-    const maxHeadingRad = 0.55;
+    const maxHeadingRad = 0.75;
     const targetHeading = steerTarget * maxHeadingRad;
-    const followRate = 8;
+    const followRate = 22;
     sim.heading = lerp(sim.heading, targetHeading, followRate * dt);
   }
 
