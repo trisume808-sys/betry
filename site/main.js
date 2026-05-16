@@ -392,11 +392,6 @@ const sim = {
   lastTelemetryT: 0,
 };
 
-let quality = 2;
-let avgDtMs = 16.7;
-
-const miniCache = new Map();
-
 const sensor = {
   hasData: false,
   mapped: 0,
@@ -414,7 +409,7 @@ const touch = {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const dpr = () => Math.min(1.5, Math.max(1, window.devicePixelRatio || 1));
+const dpr = () => Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 
 const resize = () => {
   const ratio = dpr();
@@ -867,8 +862,7 @@ const drawSky = (w, h) => {
 
   ctx.save();
   ctx.globalAlpha = 0.55;
-  const starCount = quality === 0 ? 12 : quality === 1 ? 22 : 34;
-  for (let i = 0; i < starCount; i += 1) {
+  for (let i = 0; i < 34; i += 1) {
     const x = (w * ((i * 53) % 257)) / 257;
     const y = (h * ((i * 97) % 233)) / 233;
     const tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.7));
@@ -885,9 +879,8 @@ const drawSky = (w, h) => {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.lineWidth = 1.25;
-  const gridCount = quality === 0 ? 6 : quality === 1 ? 10 : 14;
-  for (let i = 0; i < gridCount; i += 1) {
-    const tt = (i + shift) / gridCount;
+  for (let i = 0; i < 14; i += 1) {
+    const tt = (i + shift) / 14;
     const p = tt * tt;
     const y = lerp(horizonY + 6, h, p);
     const a = 0.02 + (1 - tt) * 0.11;
@@ -900,9 +893,8 @@ const drawSky = (w, h) => {
   }
   ctx.globalAlpha = 0.1;
   ctx.strokeStyle = "rgba(34,211,238,0.8)";
-  const rayCount = quality === 0 ? 4 : quality === 1 ? 6 : 8;
-  for (let i = 0; i <= rayCount; i += 1) {
-    const x = lerp(-w * 0.15, w * 1.15, i / rayCount);
+  for (let i = 0; i <= 8; i += 1) {
+    const x = lerp(-w * 0.15, w * 1.15, i / 8);
     ctx.beginPath();
     ctx.moveTo(w * 0.5, horizonY);
     ctx.lineTo(x, h);
@@ -988,7 +980,7 @@ const drawFinishBand = (cx, roadHalf, y) => {
 const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y0 = h * VIEW_Y0_T;
   const y1 = h * VIEW_Y1_T;
-  const steps = quality === 0 ? 26 : quality === 1 ? 34 : 46;
+  const steps = 46;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const elevScale = Math.min(0.11, h * 0.00018);
@@ -1159,8 +1151,6 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
 };
 
 const drawMiniMap = (w, h, carX, distance, offroad, heading, danger) => {
-  const trackId = state.trackId;
-  const track = getTrack();
   const pad = 14;
   const mapW = Math.min(w * 0.34, 260);
   const mapH = mapW * 0.72;
@@ -1168,29 +1158,24 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading, danger) => {
   const y0 = pad;
   const y1 = y0 + mapH;
   const inset = 12;
-  const fd = track.finishDistance;
+  const fd = getTrack().finishDistance;
 
-  let cache = miniCache.get(trackId);
-  if (!cache || cache.fd !== fd) {
-    const steps = 72;
-    const ptsL = [];
-    const ptsR = [];
-    let minX = Infinity;
-    let maxX = -Infinity;
-    for (let i = 0; i <= steps; i += 1) {
-      const tt = i / steps;
-      const yWorld = tt * fd;
-      const c = centerX(yWorld);
-      const hw = halfWidth(yWorld);
-      minX = Math.min(minX, c - hw);
-      maxX = Math.max(maxX, c + hw);
-      ptsL.push([c - hw, tt]);
-      ptsR.push([c + hw, tt]);
-    }
-    cache = { fd, ptsL, ptsR, minX, maxX };
-    miniCache.set(trackId, cache);
+  const steps = 160;
+  const ptsL = [];
+  const ptsR = [];
+  let minX = Infinity;
+  let maxX = -Infinity;
+
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const yWorld = t * fd;
+    const c = centerX(yWorld);
+    const hw = halfWidth(yWorld);
+    minX = Math.min(minX, c - hw);
+    maxX = Math.max(maxX, c + hw);
+    ptsL.push([c - hw, t]);
+    ptsR.push([c + hw, t]);
   }
-  const { ptsL, ptsR, minX, maxX } = cache;
 
   const spanX = Math.max(1, maxX - minX);
   const sx = (mapW - inset * 2) / spanX;
@@ -1562,9 +1547,6 @@ const updateSim = (t) => {
   sim.lastT = t;
   const dt = clamp(dtMs / 1000, 0, 0.05);
 
-  avgDtMs = avgDtMs * 0.92 + dtMs * 0.08;
-  quality = avgDtMs > 34 ? 0 : avgDtMs > 24 ? 1 : 2;
-
   const w = canvas.width;
   const h = canvas.height;
 
@@ -1678,8 +1660,8 @@ const drawFrame = (w, h) => {
   const danger = state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs;
   const heading = sim.roadAngle + sim.heading;
   drawRoadFlat(w, h, sim.x, sim.distance, heading, danger);
-  if (quality >= 1) drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading, danger);
-  if (quality >= 1) drawCockpit(w, h, state.offroad);
+  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading, danger);
+  drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
   else drawSetupUi(w, h);
@@ -1716,7 +1698,7 @@ const drawFrame = (w, h) => {
     );
     ctx.restore();
   }
-  if (quality >= 2) drawPostFx(w, h);
+  drawPostFx(w, h);
   drawFullscreenExitOverlay(w, h);
 };
 
