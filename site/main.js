@@ -1389,11 +1389,6 @@ const updateSim = (t) => {
     const steer = sim.steerSmooth * state.sensitivity * state.steerStrength;
     sim.x += steer * speed * dt * 0.85;
 
-    if (!touch.active && Math.abs(steerTarget) < 0.02) {
-      const pull = Math.pow(0.92, (dtMs / 16.7) * (state.returnRate / 7.5));
-      sim.x = c + (sim.x - c) * pull;
-    }
-
     const yCarWorldNew = sim.distance + carT * lookahead;
     const nc = centerX(yCarWorldNew);
     const nhw = halfWidth(yCarWorldNew);
