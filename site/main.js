@@ -664,7 +664,7 @@ const drawCockpit = (w, h, offroad) => {
   ctx.arc(wx, wy, wheelR * 0.66, -Math.PI * 0.15, Math.PI * 1.15);
   ctx.stroke();
 
-  const steerAngle = clamp(sim.steerAngle * 2.2, -1.35, 1.35);
+  const steerAngle = clamp(sim.heading * 2.5, -1.35, 1.35);
   ctx.save();
   ctx.translate(wx, wy);
   ctx.rotate(steerAngle);
@@ -823,6 +823,7 @@ const updateSim = (t) => {
     const targetHeading = steerTarget * maxHeadingRad;
     const followRate = 55;
     sim.heading = lerp(sim.heading, targetHeading, followRate * dt);
+    sim.steerAngle = sim.heading;
   }
 
   sim.steerSmooth = steerTarget;
