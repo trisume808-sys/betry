@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-14";
+const BUILD_ID = "20260516-15";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -1119,7 +1119,10 @@ const drawFrame = (w, h) => {
     ctx.font = `${scoreFs}px ui-sans-serif, system-ui`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`得分 ${state.score}`, w * 0.5, Math.max(scoreFs * 0.8, by - scoreFs * 0.55));
+    const hudPad = 14;
+    const hudH = 92;
+    const scoreY = Math.max(scoreFs * 0.85, hudPad + hudH + scoreFs * 0.75);
+    ctx.fillText(`得分 ${state.score}`, w * 0.5, scoreY);
     ctx.fillStyle = "rgba(244,244,245,0.9)";
     ctx.font = `${Math.max(14, Math.floor(w * 0.022))}px ui-sans-serif, system-ui`;
     ctx.fillText(`用时 ${formatMs(state.finishMs)}   扣分 ${state.penalty}`, w * 0.5, by + bh * 0.56);
