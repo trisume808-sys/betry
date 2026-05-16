@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-9";
+const BUILD_ID = "20260516-10";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -456,10 +456,32 @@ const drawButton = (key, label, rect, variant) => {
   ctx.globalAlpha = 1;
 
   ctx.fillStyle = variant === "primary" ? "rgba(9,9,11,0.95)" : "rgba(244,244,245,0.92)";
-  ctx.font = `${Math.floor(rect.h * 0.42)}px ui-sans-serif, system-ui`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  const maxW = rect.w - 24;
+  const splitAt = label.indexOf("（");
+  const canTwoLine = splitAt > 0 && rect.h >= 46;
+  if (canTwoLine) {
+    const a = label.slice(0, splitAt);
+    const b = label.slice(splitAt);
+    let fs = Math.floor(rect.h * 0.28);
+    for (let i = 0; i < 18; i += 1) {
+      ctx.font = `${fs}px ui-sans-serif, system-ui`;
+      if (ctx.measureText(a).width <= maxW && ctx.measureText(b).width <= maxW) break;
+      fs = Math.max(10, fs - 1);
+    }
+    const ym = rect.y + rect.h / 2;
+    ctx.fillText(a, rect.x + rect.w / 2, ym - fs * 0.6);
+    ctx.fillText(b, rect.x + rect.w / 2, ym + fs * 0.6);
+  } else {
+    let fs = Math.floor(rect.h * 0.38);
+    for (let i = 0; i < 18; i += 1) {
+      ctx.font = `${fs}px ui-sans-serif, system-ui`;
+      if (ctx.measureText(label).width <= maxW) break;
+      fs = Math.max(10, fs - 1);
+    }
+    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  }
   ctx.restore();
 };
 
