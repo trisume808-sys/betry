@@ -407,7 +407,10 @@ const lowEnd =
 const perf = {
   frame: 0,
   renderEvery: lowEnd ? 2 : 1,
+  renderEverySetup: lowEnd ? 3 : 2,
   maxDpr: lowEnd ? 1 : 1.25,
+  lastStatus: "setup",
+  forceDraw: false,
 };
 
 const dpr = () => {
@@ -880,6 +883,29 @@ const drawSky = (w, h) => {
   ctx.restore();
 };
 
+const drawSetupBackdrop = (w, h) => {
+  const y0 = h * 0.42;
+  const g = ctx.createLinearGradient(0, y0, 0, h);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(0,0,0,0.55)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y0, w, h - y0);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.12;
+  ctx.strokeStyle = "rgba(34,211,238,0.8)";
+  ctx.lineWidth = 1;
+  const step = Math.max(18, Math.floor(h * 0.06));
+  for (let y = y0 + step; y < h; y += step) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
 const drawPostFx = (w, h) => {
   ctx.save();
   const v = ctx.createRadialGradient(w * 0.5, h * 0.55, Math.min(w, h) * 0.2, w * 0.5, h * 0.55, Math.max(w, h) * 0.72);
@@ -914,14 +940,7 @@ const drawFinishBand = (cx, roadHalf, y) => {
 const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y0 = h * VIEW_Y0_T;
   const y1 = h * VIEW_Y1_T;
-  const steps =
-    state.status === "running"
-      ? lowEnd
-        ? 20
-        : 24
-      : lowEnd
-        ? 24
-        : 30;
+  const steps = state.status === "running" ? (lowEnd ? 24 : 28) : 18;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const elevScale = Math.min(0.11, h * 0.00018);
@@ -1559,7 +1578,19 @@ const updateSim = (t) => {
   state.score = calcScore(state.finishMs ?? state.elapsedMs, state.penalty);
 
   perf.frame += 1;
-  if (perf.frame % perf.renderEvery === 0) drawFrame(w, h);
+  if (perf.lastStatus !== state.status) {
+    perf.lastStatus = state.status;
+    perf.forceDraw = true;
+  }
+
+  const renderEveryNow = state.status === "running" ? perf.renderEvery : perf.renderEverySetup;
+  const needLive =
+    (state.status === "running" && touch.active) || (state.status !== "running" && ui.sliderActive);
+
+  if (perf.forceDraw || needLive || perf.frame % renderEveryNow === 0) {
+    perf.forceDraw = false;
+    drawFrame(w, h);
+  }
 };
 
 const drawFrame = (w, h) => {
@@ -1567,8 +1598,12 @@ const drawFrame = (w, h) => {
   drawSky(w, h);
   const danger = state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs;
   const heading = sim.roadAngle + sim.heading;
-  drawRoadFlat(w, h, sim.x, sim.distance, heading, danger);
-  drawCockpit(w, h, state.offroad);
+  if (state.status === "running") {
+    drawRoadFlat(w, h, sim.x, sim.distance, heading, danger);
+    drawCockpit(w, h, state.offroad);
+  } else {
+    drawSetupBackdrop(w, h);
+  }
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
   else drawSetupUi(w, h);
