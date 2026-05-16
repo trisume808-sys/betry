@@ -4,12 +4,15 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const track = {
   halfWidth: 230,
   bends: [
-    { start: 520, length: 980, amp: -180 },
-    { start: 2320, length: 980, amp: 240 },
+    { start: 120, length: 720, amp: -260 },
+    { start: 2120, length: 860, amp: 320 },
   ],
 };
 
-const bendShape = (t) => Math.sin(clamp(t, 0, 1) * Math.PI);
+const bendShape = (t) => {
+  const u = clamp(t, 0, 1);
+  return u * u * (3 - 2 * u);
+};
 
 const centerX = (y) => {
   let x = 0;
