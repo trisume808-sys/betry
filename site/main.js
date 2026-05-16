@@ -137,24 +137,39 @@ const createHypercarSprite = ({ width = 56, height = 112, scale = 2 } = {}) => {
 
 const playerSprite = createHypercarSprite({ scale: 2 });
 
+const playerGlow = (() => {
+  const pad = 26;
+  const canvas = document.createElement("canvas");
+  canvas.width = playerSprite.w + pad * 2;
+  canvas.height = playerSprite.h + pad * 2;
+  const g = canvas.getContext("2d");
+  if (!g) return null;
+
+  const x = pad - playerSprite.ax;
+  const y = pad - playerSprite.ay;
+
+  g.save();
+  g.globalCompositeOperation = "screen";
+  g.shadowColor = "rgba(34,211,238,0.55)";
+  g.shadowBlur = 18;
+  g.drawImage(playerSprite.canvas, x, y);
+  g.shadowColor = "rgba(244,114,182,0.40)";
+  g.shadowBlur = 14;
+  g.drawImage(playerSprite.canvas, x, y);
+  g.restore();
+
+  return { canvas, ax: playerSprite.ax + pad, ay: playerSprite.ay + pad };
+})();
+
 const drawPlayerSprite = (x, y, angleRad, sizePx, offroad) => {
   const s = Math.max(0.001, sizePx / playerSprite.h);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angleRad);
   ctx.scale(s, s);
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  ctx.shadowColor = "rgba(34,211,238,0.55)";
-  ctx.shadowBlur = 18;
-  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
-  ctx.shadowColor = "rgba(244,114,182,0.40)";
-  ctx.shadowBlur = 14;
-  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
-  ctx.restore();
-
+  if (playerGlow) ctx.drawImage(playerGlow.canvas, -playerGlow.ax, -playerGlow.ay);
   ctx.shadowColor = "rgba(0,0,0,0.65)";
-  ctx.shadowBlur = 10;
+  ctx.shadowBlur = 8;
   ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
   ctx.shadowBlur = 0;
   if (offroad) {
@@ -781,13 +796,15 @@ const drawFinishBand = (cx, roadHalf, y) => {
 const drawRoadFlat = (w, h, carX, distance, heading) => {
   const y0 = h * 0.16;
   const y1 = h * 0.9;
-  const steps = 56;
+  const steps = 46;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const elevScale = Math.min(0.11, h * 0.00018);
 
   const left = [];
   const right = [];
+  let spanL = Infinity;
+  let spanR = -Infinity;
 
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
@@ -800,6 +817,8 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
     const y = clamp(lerp(y1, y0, t) - elev * elevScale * (1 - t * 0.15), y0, y1);
     left.push([cx - roadHalfPx, y]);
     right.push([cx + roadHalfPx, y]);
+    spanL = Math.min(spanL, cx - roadHalfPx);
+    spanR = Math.max(spanR, cx + roadHalfPx);
   }
 
   ctx.save();
@@ -820,34 +839,43 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
 
   ctx.save();
   ctx.clip();
-  const roadSpanL = Math.min(...left.map((p) => p[0]));
-  const roadSpanR = Math.max(...right.map((p) => p[0]));
-  const highlight = ctx.createLinearGradient(roadSpanL, 0, roadSpanR, 0);
+  const highlight = ctx.createLinearGradient(spanL, 0, spanR, 0);
   highlight.addColorStop(0, "rgba(255,255,255,0)");
   highlight.addColorStop(0.46, "rgba(255,255,255,0.10)");
   highlight.addColorStop(0.54, "rgba(255,255,255,0.06)");
   highlight.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = highlight;
-  ctx.fillRect(roadSpanL, y0, roadSpanR - roadSpanL, y1 - y0);
+  ctx.fillRect(spanL, y0, spanR - spanL, y1 - y0);
   ctx.restore();
 
   const edgeW = Math.max(3, Math.floor(w * 0.006));
   ctx.lineWidth = edgeW;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(left[0][0], left[0][1]);
   for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
-  ctx.shadowColor = "rgba(34,211,238,0.55)";
-  ctx.shadowBlur = edgeW * 2.3;
-  ctx.strokeStyle = "rgba(34,211,238,0.62)";
+  ctx.strokeStyle = "rgba(34,211,238,0.52)";
   ctx.stroke();
   ctx.beginPath();
   ctx.moveTo(right[0][0], right[0][1]);
   for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.shadowColor = "rgba(244,114,182,0.42)";
-  ctx.shadowBlur = edgeW * 2.2;
-  ctx.strokeStyle = "rgba(244,114,182,0.52)";
+  ctx.strokeStyle = "rgba(244,114,182,0.44)";
   ctx.stroke();
-  ctx.shadowBlur = 0;
+
+  ctx.lineWidth = edgeW * 2.4;
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = "rgba(34,211,238,0.60)";
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(244,114,182,0.50)";
+  ctx.beginPath();
+  ctx.moveTo(right[0][0], right[0][1]);
+  for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 
   const stripeH = 26;
   const stripeW = 6;
