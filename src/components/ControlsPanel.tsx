@@ -164,16 +164,9 @@ export default function ControlsPanel() {
     setStatus("running");
   }
 
-  const sensorReady = sensorSupported && sensorPermission === "granted" && sensorEnabled;
-
-  function switchToSensor() {
-    if (sensorSupported && sensorPermission === "granted") {
-      setSensorEnabled(true);
-      setInputMode("sensor");
-      return;
-    }
-    void enableSensor();
-  }
+  const showEnable =
+    inputMode === "sensor" &&
+    (!sensorEnabled || sensorPermission !== "granted" || !sensorSupported);
 
   if (status === "running") {
     return (
@@ -227,23 +220,18 @@ export default function ControlsPanel() {
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2">
-        {inputMode === "sensor" ? (
-          sensorReady ? (
-            <Button
-              onClick={() => {
-                setInputMode("touch");
-              }}
-            >
-              使用触控
-            </Button>
-          ) : (
-            <Button onClick={enableSensor} variant="primary">
-              {promptRequired ? "启用传感器（点我）" : "启用传感器"}
-            </Button>
-          )
+        {showEnable ? (
+          <Button onClick={enableSensor} variant="primary">
+            {promptRequired ? "启用传感器（点我）" : "启用传感器"}
+          </Button>
         ) : (
-          <Button onClick={switchToSensor} variant="primary">
-            使用传感器
+          <Button
+            onClick={() => {
+              setInputMode("touch");
+              setSensorEnabled(false);
+            }}
+          >
+            使用触控模式
           </Button>
         )}
         <Button onClick={calibrate}>

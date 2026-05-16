@@ -7,7 +7,7 @@ function formatMs(ms: number) {
   return `${m}:${r.toFixed(2).padStart(5, "0")}`;
 }
 
-export default function Hud(props: { onOpenTutorial?: () => void }) {
+export default function Hud() {
   const status = useGameStore((s) => s.status);
   const inputMode = useGameStore((s) => s.inputMode);
   const sensorEnabled = useGameStore((s) => s.sensorEnabled);
@@ -46,19 +46,8 @@ export default function Hud(props: { onOpenTutorial?: () => void }) {
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <div className="flex items-center gap-2">
-          <div className="rounded-full bg-zinc-900 px-2 py-1 text-xs text-zinc-200">
-            {modeLabel}
-          </div>
-          {props.onOpenTutorial ? (
-            <button
-              type="button"
-              onClick={props.onOpenTutorial}
-              className="rounded-full bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-            >
-              教程
-            </button>
-          ) : null}
+        <div className="rounded-full bg-zinc-900 px-2 py-1 text-xs text-zinc-200">
+          {modeLabel}
         </div>
         <div className="text-right text-xs text-zinc-400">
           {status === "finished" && finishMs != null
