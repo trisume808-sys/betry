@@ -399,23 +399,20 @@ const touch = {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const dpr = () => {
-  const raw = Math.max(1, window.devicePixelRatio || 1);
-  const mem = typeof navigator !== "undefined" ? navigator.deviceMemory : undefined;
-  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency : undefined;
-  const max =
-    typeof mem === "number" && mem <= 4 ? 1 : typeof cores === "number" && cores <= 4 ? 1 : 1.25;
-  return Math.min(raw, max);
-};
+const lowEnd =
+  typeof navigator !== "undefined" &&
+  ((typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4) ||
+    (typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4));
 
 const perf = {
   frame: 0,
-  renderEvery:
-    (typeof navigator !== "undefined" &&
-      ((typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4) ||
-        (typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4)))
-      ? 2
-      : 1,
+  renderEvery: lowEnd ? 2 : 1,
+  maxDpr: lowEnd ? 1 : 1.25,
+};
+
+const dpr = () => {
+  const raw = Math.max(1, window.devicePixelRatio || 1);
+  return Math.min(raw, perf.maxDpr);
 };
 
 const resize = () => {
@@ -1287,11 +1284,9 @@ const drawTopHud = (w, h) => {
 const drawFullscreenExitOverlay = (w, h) => {
   if (!document.fullscreenElement) return;
   const pad = 14;
-  const mapW = Math.min(w * 0.34, 260);
-  const gap = 10;
   const btnW = Math.min(170, Math.floor(w * 0.22));
   const btnH = 40;
-  const x = Math.max(pad, w - pad - mapW - gap - btnW);
+  const x = Math.max(pad, w - pad - btnW);
   const y = pad;
   drawButton("exitfs", "退出全屏", { x, y, w: btnW, h: btnH }, "primary");
 };
@@ -1566,7 +1561,6 @@ const drawFrame = (w, h) => {
   const danger = state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs;
   const heading = sim.roadAngle + sim.heading;
   drawRoadFlat(w, h, sim.x, sim.distance, heading, danger);
-  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading, danger);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
