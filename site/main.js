@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-20";
+const BUILD_ID = "20260517-16";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -955,11 +955,21 @@ const makeShareImage = (entry, rank) => {
     g.fillStyle = glow2;
     g.fillRect(boxX, boxY, boxW, boxH);
 
-    const s = Math.min((boxW * 0.62) / playerSprite.w, (boxH * 0.84) / playerSprite.h);
+    const s = Math.min((boxW * 0.74) / playerSprite.w, (boxH * 0.92) / playerSprite.h);
     g.save();
     g.translate(boxX + boxW / 2, boxY + boxH / 2 + 10);
     g.rotate(-0.18);
     g.scale(s, s);
+    const glowSprite = playerGlowNormal;
+    if (glowSprite) {
+      g.save();
+      g.globalCompositeOperation = "screen";
+      g.globalAlpha = 0.92;
+      g.shadowColor = "rgba(34,211,238,0.55)";
+      g.shadowBlur = 18;
+      g.drawImage(glowSprite.canvas, -glowSprite.ax, -glowSprite.ay);
+      g.restore();
+    }
     g.shadowColor = "rgba(0,0,0,0.62)";
     g.shadowBlur = 14;
     g.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
