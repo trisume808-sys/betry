@@ -1,81 +1,8 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
-const dot = (ax, ay, bx, by) => ax * bx + ay * by;
-
-const TRACK_STEP = 12;
-const buildTrack = () => {
-  const L1 = 720;
-  const L2 = 520;
-  const L3 = 880;
-  const R = 520;
-  const arcLen = (Math.PI * 0.5) * R;
-
-  let x = 0;
-  let y = 0;
-  let heading = 0;
-  let s = 0;
-
-  const pts = [{ s, x, y, heading }];
-
-  const push = () => {
-    pts.push({ s, x, y, heading });
-  };
-
-  const advance = (ds) => {
-    x += ds * Math.sin(heading);
-    y += ds * Math.cos(heading);
-    s += ds;
-    push();
-  };
-
-  const straight = (len) => {
-    let rem = len;
-    while (rem > 0) {
-      const ds = Math.min(TRACK_STEP, rem);
-      advance(ds);
-      rem -= ds;
-    }
-  };
-
-  const turn = (len, dir) => {
-    let rem = len;
-    const k = dir / R;
-    while (rem > 0) {
-      const ds = Math.min(TRACK_STEP, rem);
-      heading += k * ds;
-      advance(ds);
-      rem -= ds;
-    }
-  };
-
-  straight(L1);
-  turn(arcLen, +1);
-  straight(L2);
-  turn(arcLen, -1);
-  straight(L3);
-
-  return { pts, total: s };
-};
-
-const track = buildTrack();
-const finishDistance = track.total;
-const roadHalfAt = () => 230;
-
-const trackAt = (s) => {
-  const ss = clamp(s, 0, finishDistance);
-  const pts = track.pts;
-  let i = 0;
-  while (i < pts.length - 2 && pts[i + 1].s < ss) i += 1;
-  const a = pts[i];
-  const b = pts[i + 1];
-  const span = Math.max(1e-6, b.s - a.s);
-  const t = (ss - a.s) / span;
-  return {
-    x: lerp(a.x, b.x, t),
-    y: lerp(a.y, b.y, t),
-    heading: lerp(a.heading, b.heading, t),
-  };
-};
+const centerX = () => 0;
+const halfWidth = () => 230;
+const finishDistance = 3600;
 
 const state = {
   status: "setup",
@@ -107,7 +34,6 @@ const ui = {
 
 const sim = {
   x: 0,
-  y: 0,
   heading: 0,
   distance: 0,
   elapsedMs: 0,
@@ -246,7 +172,6 @@ const resetRun = () => {
   state.offroad = false;
   state.tiltSmooth = 0;
   sim.x = 0;
-  sim.y = 0;
   sim.heading = 0;
   sim.distance = 0;
   sim.elapsedMs = 0;
@@ -522,53 +447,25 @@ const drawFinishBand = (cx, roadHalf, y) => {
   ctx.restore();
 };
 
-const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
+const drawRoadFlat = (w, h, carX, distance, heading) => {
   const y0 = h * 0.16;
   const y1 = h * 0.9;
   const steps = 56;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
-  const curveScale = roadHalfPx / roadHalfAt(s0);
-
-  const camHeading = trackAt(s0).heading;
-  const fwdX = Math.sin(camHeading);
-  const fwdY = Math.cos(camHeading);
-  const rightX = Math.cos(camHeading);
-  const rightY = -Math.sin(camHeading);
+  const curveScale = 0.22;
 
   const left = [];
   const right = [];
 
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
-    const s = s0 + t * lookahead;
-    const center = trackAt(s);
-    const dxC = center.x - carX;
-    const dyC = center.y - carY;
-    const f = dot(dxC, dyC, fwdX, fwdY);
-    const tt = clamp(f / lookahead, 0, 1);
-    const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
-
-    const roadHalfW = roadHalfAt(s);
-    const rnX = Math.cos(center.heading);
-    const rnY = -Math.sin(center.heading);
-    const lxW = center.x - rnX * roadHalfW;
-    const lyW = center.y - rnY * roadHalfW;
-    const rxW = center.x + rnX * roadHalfW;
-    const ryW = center.y + rnY * roadHalfW;
-
-    const ldx = lxW - carX;
-    const ldy = lyW - carY;
-    const rdx = rxW - carX;
-    const rdy = ryW - carY;
-
-    const lR = dot(ldx, ldy, rightX, rightY);
-    const rR = dot(rdx, rdy, rightX, rightY);
-    const cxL = w / 2 + lR * curveScale * scale;
-    const cxR = w / 2 + rR * curveScale * scale;
-    const y = lerp(y1, y0, tt);
-    left.push([cxL, y, tt]);
-    right.push([cxR, y, tt]);
+    const yWorld = distance + t * lookahead;
+    const c = centerX(yWorld) - carX;
+    const cx = w / 2 + c * curveScale;
+    const y = lerp(y1, y0, t);
+    left.push([cx - roadHalfPx, y]);
+    right.push([cx + roadHalfPx, y]);
   }
 
   ctx.save();
@@ -600,34 +497,24 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = "#e5e7eb";
   for (let y = y1; y > y0; y -= stripeH + stripeGap) {
-    const dy = (s0 * 0.22) % (stripeH + stripeGap);
+    const dy = (distance * 0.22) % (stripeH + stripeGap);
     const yy = y + dy;
-    const tt = clamp((y1 - yy) / (y1 - y0), 0, 1);
-    const s = s0 + tt * lookahead;
-    const center = trackAt(s);
-    const dx = center.x - carX;
-    const dyW = center.y - carY;
-    const rr = dot(dx, dyW, rightX, rightY);
-    const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
-    const cx = w / 2 + rr * curveScale * scale;
-    const yyy = lerp(y1, y0, tt);
-    drawRoundRect(cx - stripeW / 2, yyy - stripeH, stripeW, stripeH, 3);
+    const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
+    const yWorld = distance + t * lookahead;
+    const c = centerX(yWorld) - carX;
+    const cx = w / 2 + c * curveScale;
+    drawRoundRect(cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  const finish = trackAt(finishDistance);
-  const fdx = finish.x - carX;
-  const fdy = finish.y - carY;
-  const finishF = dot(fdx, fdy, fwdX, fwdY);
-  if (finishF > 0 && finishF < lookahead) {
-    const tt = finishF / lookahead;
-    const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
-    const y = lerp(y1, y0, tt);
-    const rr = dot(fdx, fdy, rightX, rightY);
-    const cx = w / 2 + rr * curveScale * scale;
-    const rh = roadHalfAt(finishDistance) * curveScale * scale;
-    drawFinishBand(cx, rh, y);
+  const finishT = (finishDistance - distance) / lookahead;
+  if (finishT > 0 && finishT < 1) {
+    const y = lerp(y1, y0, finishT);
+    const yWorld = finishDistance;
+    const c = centerX(yWorld) - carX;
+    const cx = w / 2 + c * curveScale;
+    drawFinishBand(cx, roadHalfPx, y);
   }
 
   const carMarkerY = h * 0.74;
@@ -647,7 +534,7 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   ctx.beginPath();
   ctx.save();
   ctx.translate(w / 2, carMarkerY - 18);
-  ctx.rotate(carHeading - camHeading);
+  ctx.rotate(heading);
   ctx.moveTo(0, -10);
   ctx.lineTo(8, 10);
   ctx.lineTo(-8, 10);
@@ -665,7 +552,7 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   ctx.restore();
 };
 
-const drawMiniMap = (w, h, carX, carY, distance, offroad, heading) => {
+const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const pad = 14;
   const mapW = Math.min(w * 0.34, 260);
   const mapH = mapW * 0.72;
@@ -673,23 +560,30 @@ const drawMiniMap = (w, h, carX, carY, distance, offroad, heading) => {
   const y0 = pad;
   const y1 = y0 + mapH;
   const inset = 12;
-  const pts = track.pts;
+
+  const steps = 160;
+  const ptsL = [];
+  const ptsR = [];
   let minX = Infinity;
   let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (const p of pts) {
-    const hw = roadHalfAt(p.s);
-    minX = Math.min(minX, p.x - hw);
-    maxX = Math.max(maxX, p.x + hw);
-    minY = Math.min(minY, p.y - hw);
-    maxY = Math.max(maxY, p.y + hw);
+
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const yWorld = t * finishDistance;
+    const c = centerX(yWorld);
+    const hw = halfWidth(yWorld);
+    minX = Math.min(minX, c - hw);
+    maxX = Math.max(maxX, c + hw);
+    ptsL.push([c - hw, t]);
+    ptsR.push([c + hw, t]);
   }
 
   const spanX = Math.max(1, maxX - minX);
-  const spanY = Math.max(1, maxY - minY);
   const sx = (mapW - inset * 2) / spanX;
-  const sy = (mapH - inset * 2) / spanY;
+  const sy = mapH - inset * 2;
+
+  const mapX = (x) => x0 + inset + (x - minX) * sx;
+  const mapY = (t) => y0 + inset + t * sy;
 
   ctx.save();
   ctx.fillStyle = "rgba(10,10,18,0.65)";
@@ -700,35 +594,16 @@ const drawMiniMap = (w, h, carX, carY, distance, offroad, heading) => {
   drawRoundRect(x0 + 0.75, y0 + 0.75, mapW - 1.5, mapH - 1.5, 13);
   ctx.stroke();
 
-  const mapX = (x) => x0 + inset + (x - minX) * sx;
-  const mapY = (y) => y0 + inset + (y - minY) * sy;
-
   ctx.beginPath();
-  for (let i = 0; i < pts.length; i += 1) {
-    const p = pts[i];
-    const hw = roadHalfAt(p.s);
-    const rx = p.x + Math.cos(p.heading) * hw;
-    const ry = p.y - Math.sin(p.heading) * hw;
-    const px = mapX(rx);
-    const py = mapY(ry);
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  for (let i = pts.length - 1; i >= 0; i -= 1) {
-    const p = pts[i];
-    const hw = roadHalfAt(p.s);
-    const lx = p.x - Math.cos(p.heading) * hw;
-    const ly = p.y + Math.sin(p.heading) * hw;
-    ctx.lineTo(mapX(lx), mapY(ly));
-  }
+  ctx.moveTo(mapX(ptsL[0][0]), mapY(ptsL[0][1]));
+  for (let i = 1; i < ptsL.length; i += 1) ctx.lineTo(mapX(ptsL[i][0]), mapY(ptsL[i][1]));
+  for (let i = ptsR.length - 1; i >= 0; i -= 1) ctx.lineTo(mapX(ptsR[i][0]), mapY(ptsR[i][1]));
   ctx.closePath();
   ctx.fillStyle = "rgba(20,20,27,0.9)";
   ctx.fill();
 
-  const start = trackAt(0);
-  const finish = trackAt(finishDistance);
-  const startY = mapY(start.y);
-  const finishY = mapY(finish.y);
+  const startY = mapY(0);
+  const finishY = mapY(1);
   ctx.strokeStyle = "rgba(244,244,245,0.55)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -740,8 +615,9 @@ const drawMiniMap = (w, h, carX, carY, distance, offroad, heading) => {
   ctx.lineTo(x0 + mapW - inset, finishY);
   ctx.stroke();
 
+  const carT = clamp(distance / finishDistance, 0, 1);
   const carPx = mapX(carX);
-  const carPy = mapY(carY);
+  const carPy = mapY(carT);
   ctx.save();
   ctx.translate(carPx, carPy);
   ctx.rotate(Math.PI + heading);
@@ -944,16 +820,10 @@ const updateSim = (t) => {
 
   const baseSpeed = 260;
   const carHalf = 12;
-  const track0 = trackAt(sim.distance);
-  const tn0X = Math.sin(track0.heading);
-  const tn0Y = Math.cos(track0.heading);
-  const rn0X = Math.cos(track0.heading);
-  const rn0Y = -Math.sin(track0.heading);
-  const dx0 = sim.x - track0.x;
-  const dy0 = sim.y - track0.y;
-  const lateral0 = dot(dx0, dy0, rn0X, rn0Y);
-  const hw0 = roadHalfAt(sim.distance);
-  const offroad0 = Math.abs(lateral0) > hw0 - carHalf;
+  const y0 = sim.distance;
+  const c0 = centerX(y0);
+  const hw0 = halfWidth(y0);
+  const offroad0 = Math.abs(sim.x - c0) > hw0 - carHalf;
   const speed0 = baseSpeed * (offroad0 ? 0.55 : 1);
 
   if (state.status === "running") {
@@ -969,29 +839,13 @@ const updateSim = (t) => {
     const yawRate = (speed0 / wheelBase) * Math.tan(sim.steerAngle) * state.steerStrength;
     sim.heading += yawRate * dt;
 
+    sim.distance += speed0 * Math.cos(sim.heading) * dt;
     sim.x += speed0 * Math.sin(sim.heading) * dt;
-    sim.y += speed0 * Math.cos(sim.heading) * dt;
 
-    const trackNow = trackAt(sim.distance);
-    const trackHeading = trackNow.heading;
-    const ds = speed0 * Math.cos(sim.heading - trackHeading) * dt;
-    sim.distance += Math.max(0, ds);
-
-    const tnX = Math.sin(trackHeading);
-    const tnY = Math.cos(trackHeading);
-    const rnX = Math.cos(trackHeading);
-    const rnY = -Math.sin(trackHeading);
-    const dx = sim.x - trackNow.x;
-    const dy = sim.y - trackNow.y;
-    const along = dot(dx, dy, tnX, tnY);
-    const lateral = dot(dx, dy, rnX, rnY);
-    const hw = roadHalfAt(sim.distance);
-    const lim = hw - carHalf;
-    if (Math.abs(lateral) > lim) {
-      const cl = clamp(lateral, -lim, lim);
-      sim.x = trackNow.x + tnX * along + rnX * cl;
-      sim.y = trackNow.y + tnY * along + rnY * cl;
-    }
+    const ny = sim.distance;
+    const nc = centerX(ny);
+    const nhw = halfWidth(ny);
+    if (Math.abs(sim.x - nc) > nhw - carHalf) sim.x = nc + clamp(sim.x - nc, -(nhw - carHalf), nhw - carHalf);
 
     if (sim.distance >= finishDistance) {
       state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
@@ -1000,14 +854,10 @@ const updateSim = (t) => {
     }
   }
 
-  const track1 = trackAt(sim.distance);
-  const rn1X = Math.cos(track1.heading);
-  const rn1Y = -Math.sin(track1.heading);
-  const dx1 = sim.x - track1.x;
-  const dy1 = sim.y - track1.y;
-  const lateral1 = dot(dx1, dy1, rn1X, rn1Y);
-  const hw1 = roadHalfAt(sim.distance);
-  const offroad = Math.abs(lateral1) > hw1 - carHalf;
+  const y1 = sim.distance;
+  const c1 = centerX(y1);
+  const hw1 = halfWidth(y1);
+  const offroad = Math.abs(sim.x - c1) > hw1 - carHalf;
   const speed = baseSpeed * (offroad ? 0.55 : 1);
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
@@ -1021,8 +871,8 @@ const updateSim = (t) => {
 const drawFrame = (w, h) => {
   ctx.clearRect(0, 0, w, h);
   drawSky(w, h);
-  drawRoadFlat(w, h, sim.x, sim.y, sim.distance, sim.heading);
-  drawMiniMap(w, h, sim.x, sim.y, sim.distance, state.offroad, sim.heading);
+  drawRoadFlat(w, h, sim.x, sim.distance, sim.heading);
+  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, sim.heading);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
