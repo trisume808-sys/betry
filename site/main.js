@@ -1128,36 +1128,70 @@ const drawTopHud = (w, h) => {
   drawRoundRect(pad + 0.75, pad + 0.75, boxW - 1.5, boxH - 1.5, 17);
   ctx.stroke();
 
+  const titleFs = Math.max(12, Math.floor(w * 0.02));
+  const infoFs = Math.max(12, Math.floor(w * 0.022));
+
   ctx.fillStyle = "rgba(226,232,240,0.90)";
-  ctx.font = `${Math.max(12, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
+  ctx.font = `${titleFs}px ui-sans-serif, system-ui`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText("陀螺仪赛车", pad + 14, pad + 24);
 
-  ctx.fillStyle = "rgba(226,232,240,0.78)";
-  ctx.textAlign = "right";
-  ctx.fillText(
-    state.status === "running" ? formatMs(state.elapsedMs) : state.finishMs != null ? formatMs(state.finishMs) : "",
-    pad + boxW - 14,
-    pad + 24,
-  );
+  const timeText =
+    state.status === "running" ? formatMs(state.elapsedMs) : state.finishMs != null ? formatMs(state.finishMs) : "";
+
+  const flipLabel = sim.gyroFlip === -1 ? "反转" : "正常";
+  const flipFill = sim.gyroFlip === -1 ? "rgba(248,113,113,0.18)" : "rgba(34,211,238,0.16)";
+  const flipStroke = sim.gyroFlip === -1 ? "rgba(248,113,113,0.45)" : "rgba(34,211,238,0.32)";
+  const flipText = sim.gyroFlip === -1 ? "rgba(248,113,113,0.92)" : "rgba(34,211,238,0.90)";
+
+  ctx.font = `${titleFs}px ui-sans-serif, system-ui`;
+  const rightX = pad + boxW - 14;
+  const timeW = timeText ? ctx.measureText(timeText).width : 0;
+  const gap = 10;
+
+  ctx.font = `${Math.max(11, Math.floor(titleFs * 0.92))}px ui-sans-serif, system-ui`;
+  const tagTextW = ctx.measureText(flipLabel).width;
+  const tagPadX = 10;
+  const tagW = Math.ceil(tagTextW + tagPadX * 2);
+  const tagH = 20;
+  const tagY = pad + 8;
+  const tagX = Math.max(pad + 14, rightX - timeW - (timeText ? gap : 0) - tagW);
+
+  ctx.fillStyle = flipFill;
+  drawRoundRect(tagX, tagY, tagW, tagH, 10);
+  ctx.fill();
+  ctx.strokeStyle = flipStroke;
+  ctx.lineWidth = 1.25;
+  ctx.stroke();
+  ctx.fillStyle = flipText;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(flipLabel, tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+
+  if (timeText) {
+    ctx.font = `${titleFs}px ui-sans-serif, system-ui`;
+    ctx.fillStyle = "rgba(226,232,240,0.78)";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(timeText, rightX, pad + 24);
+  }
+
+  ctx.font = `${infoFs}px ui-sans-serif, system-ui`;
   ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 
   ctx.fillStyle = "rgba(34,211,238,0.92)";
-  ctx.font = `${Math.max(20, Math.floor(w * 0.05))}px ui-sans-serif, system-ui`;
-  ctx.fillText(`${Math.round(state.speed)}`, pad + 14, pad + 66);
-
-  ctx.fillStyle = "rgba(161,161,170,0.95)";
-  ctx.font = `${Math.max(11, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
-  ctx.fillText("SPEED", pad + 14 + Math.max(44, Math.floor(w * 0.1)), pad + 66);
+  ctx.fillText(`速度 ${Math.round(state.speed)}`, pad + 14, pad + 62);
 
   ctx.fillStyle = "rgba(244,114,182,0.90)";
-  ctx.font = `${Math.max(12, Math.floor(w * 0.022))}px ui-sans-serif, system-ui`;
-  ctx.fillText(`SCORE ${state.score}`, pad + 14, pad + 88);
+  ctx.textAlign = "right";
+  ctx.fillText(`得分 ${state.score}`, pad + boxW - 14, pad + 62);
 
   if (state.offroad) {
     ctx.fillStyle = "rgba(248,113,113,0.92)";
-    ctx.fillText("OFFROAD", pad + 14 + Math.max(120, Math.floor(w * 0.18)), pad + 88);
+    ctx.textAlign = "left";
+    ctx.fillText("越界扣分", pad + 14, pad + 84);
   }
 
   const barW = Math.min(w * 0.42, 320);
