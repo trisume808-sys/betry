@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-19";
+const BUILD_ID = "20260516-20";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -363,6 +363,11 @@ const onPointerDown = (e) => {
   ui.pointerDown = p;
 
   if (state.status === "running") {
+    const exitBtn = ui.rects.get("exitfs");
+    if (exitBtn && hit(p.x, p.y, exitBtn)) {
+      handleButton("exitfs");
+      return;
+    }
     const btn = ui.rects.get("restart");
     if (btn && hit(p.x, p.y, btn)) {
       resetAll();
@@ -896,6 +901,18 @@ const drawTopHud = (w, h) => {
   ctx.restore();
 };
 
+const drawFullscreenExitOverlay = (w, h) => {
+  if (!document.fullscreenElement) return;
+  const pad = 14;
+  const mapW = Math.min(w * 0.34, 260);
+  const gap = 10;
+  const btnW = Math.min(170, Math.floor(w * 0.22));
+  const btnH = 40;
+  const x = Math.max(pad, w - pad - mapW - gap - btnW);
+  const y = pad;
+  drawButton("exitfs", "退出全屏", { x, y, w: btnW, h: btnH }, "primary");
+};
+
 const drawSetupUi = (w, h) => {
   ui.rects.clear();
   const portrait = h >= w * 1.05;
@@ -1228,6 +1245,7 @@ const drawFrame = (w, h) => {
     );
     ctx.restore();
   }
+  drawFullscreenExitOverlay(w, h);
 };
 
 const loop = (t) => {
