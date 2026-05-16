@@ -334,6 +334,7 @@ const state = {
   penalty: 0,
   score: 0,
   finishMs: null,
+  animMs: 0,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
 
@@ -1315,15 +1316,68 @@ const drawSetupUi = (w, h) => {
   const titleFs = Math.max(14, Math.floor(base * (portrait ? 0.04 : 0.05)));
   const subFs = Math.max(11, Math.floor(base * (portrait ? 0.028 : 0.032)));
 
-  ctx.fillStyle = "rgba(244,244,245,0.95)";
-  ctx.font = `${titleFs}px ui-sans-serif, system-ui`;
-  ctx.textAlign = "left";
+  const t = state.animMs * 0.001;
+  const pulse = 0.72 + 0.28 * Math.sin(t * 1.6);
+  const signX = x0 + 12;
+  const signY = y0 + 12;
+  const signW = panelW - 24;
+  const signH = Math.floor(titleFs * 2.2);
+  const signG = ctx.createLinearGradient(0, signY, 0, signY + signH);
+  signG.addColorStop(0, "rgba(8,10,18,0.82)");
+  signG.addColorStop(1, "rgba(8,10,18,0.48)");
+  ctx.fillStyle = signG;
+  drawRoundRect(signX, signY, signW, signH, 18);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = `rgba(34,211,238,${0.18 + pulse * 0.22})`;
+  ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath();
+  drawRoundRect(signX, signY, signW, signH, 18);
+  ctx.clip();
+  const hi = ctx.createLinearGradient(signX, signY, signX + signW, signY + signH);
+  hi.addColorStop(0, "rgba(255,255,255,0)");
+  hi.addColorStop(0.45, "rgba(255,255,255,0.08)");
+  hi.addColorStop(0.55, "rgba(34,211,238,0.06)");
+  hi.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = hi;
+  ctx.fillRect(signX, signY, signW, signH);
+  ctx.restore();
+
+  const titleText = "零点漂移";
+  const titleX = signX + signW / 2;
+  const titleY = signY + Math.floor(signH * 0.68);
+  const neonFs = Math.floor(titleFs * 1.35);
+  ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  const titleY = y0 + 34;
-  ctx.fillText("零点漂移", x0 + 18, titleY);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.font = `700 ${neonFs}px ui-sans-serif, system-ui`;
+  ctx.lineWidth = Math.max(6, Math.floor(neonFs * 0.18));
+  ctx.strokeStyle = `rgba(34,211,238,${0.10 + pulse * 0.12})`;
+  ctx.strokeText(titleText, titleX, titleY);
+  ctx.lineWidth = Math.max(3, Math.floor(neonFs * 0.1));
+  ctx.strokeStyle = `rgba(34,211,238,${0.28 + pulse * 0.26})`;
+  ctx.strokeText(titleText, titleX, titleY);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = `rgba(167,243,208,${0.62 + pulse * 0.2})`;
+  ctx.strokeText(titleText, titleX, titleY);
+  ctx.fillStyle = "rgba(244,253,255,0.92)";
+  ctx.fillText(titleText, titleX, titleY);
+
+  ctx.globalAlpha = 0.22 + pulse * 0.14;
+  ctx.fillStyle = "rgba(244,114,182,0.55)";
+  const accentY = signY + signH - 12;
+  drawRoundRect(signX + 16, accentY, signW - 32, 6, 4);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
   ctx.fillStyle = "rgba(161,161,170,0.95)";
   ctx.font = `${subFs}px ui-sans-serif, system-ui`;
-  const subY = titleY + Math.floor(titleFs * 0.92) + 10;
+  ctx.textAlign = "left";
+  const subY = signY + signH + 24;
   ctx.fillText("启用传感器 → 校准中位 → 开始", x0 + 18, subY);
 
   const btnH = portrait ? Math.max(52, Math.floor(h * 0.062)) : Math.max(44, Math.floor(h * 0.065));
@@ -1446,6 +1500,7 @@ const updateSim = (t) => {
   const dtMs = sim.lastT ? t - sim.lastT : 16.7;
   sim.lastT = t;
   const dt = clamp(dtMs / 1000, 0, 0.05);
+  state.animMs = (state.animMs + dtMs) % 600000;
 
   const w = canvas.width;
   const h = canvas.height;
