@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-10";
+const BUILD_ID = "20260516-11";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -860,20 +860,26 @@ const drawSetupUi = (w, h) => {
   ctx.strokeStyle = "rgba(244,244,245,0.12)";
   ctx.stroke();
 
+  const base = Math.min(w, h);
+  const titleFs = Math.max(14, Math.floor(base * (portrait ? 0.04 : 0.05)));
+  const subFs = Math.max(11, Math.floor(base * (portrait ? 0.028 : 0.032)));
+
   ctx.fillStyle = "rgba(244,244,245,0.95)";
-  ctx.font = `${Math.max(14, Math.floor(w * 0.03))}px ui-sans-serif, system-ui`;
+  ctx.font = `${titleFs}px ui-sans-serif, system-ui`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("陀螺仪赛车", x0 + 18, y0 + 34);
+  const titleY = y0 + 34;
+  ctx.fillText("陀螺仪赛车", x0 + 18, titleY);
   ctx.fillStyle = "rgba(161,161,170,0.95)";
-  ctx.font = `${Math.max(11, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
-  ctx.fillText("启用传感器 → 校准中位 → 开始", x0 + 18, y0 + 58);
+  ctx.font = `${subFs}px ui-sans-serif, system-ui`;
+  const subY = titleY + Math.floor(titleFs * 0.92) + 10;
+  ctx.fillText("启用传感器 → 校准中位 → 开始", x0 + 18, subY);
 
-  const btnH = portrait ? Math.max(52, Math.floor(h * 0.062)) : Math.max(44, Math.floor(h * 0.06));
+  const btnH = portrait ? Math.max(52, Math.floor(h * 0.062)) : Math.max(44, Math.floor(h * 0.065));
   const gap = portrait ? 12 : 10;
   const innerPad = 18;
   const colW = (panelW - innerPad * 2 - gap) / 2;
-  const rowY = y0 + 74;
+  const rowY = subY + 18;
 
   const enableLabel = isPermissionPromptRequired() ? "启用传感器（点我）" : "启用传感器";
   drawButton("enable", enableLabel, { x: x0 + innerPad, y: rowY, w: panelW - innerPad * 2, h: btnH }, "primary");
