@@ -143,7 +143,7 @@ const createHypercarSprite = ({ width = 56, height = 112, scale = 2 } = {}) => {
 
 const playerSprite = createHypercarSprite({ scale: 2 });
 
-const playerGlow = (() => {
+const makeHeadlightGlow = (tone) => {
   const pad = 26;
   const canvas = document.createElement("canvas");
   canvas.width = playerSprite.w + pad * 2;
@@ -157,17 +157,22 @@ const playerGlow = (() => {
   const rx = playerSprite.w * 0.10;
   const ry = playerSprite.h * 0.06;
 
+  const glowOuter =
+    tone === "danger" ? "rgba(248,113,113,0.95)" : "rgba(220,240,255,0.85)";
+  const glowInner =
+    tone === "danger" ? "rgba(255,200,200,0.92)" : "rgba(255,255,255,0.92)";
+
   g.save();
   g.globalCompositeOperation = "screen";
-  g.shadowColor = "rgba(220,240,255,0.85)";
-  g.shadowBlur = 34;
-  g.fillStyle = "rgba(220,240,255,0.95)";
+  g.shadowColor = glowOuter;
+  g.shadowBlur = 36;
+  g.fillStyle = glowOuter;
   g.beginPath();
   g.ellipse(cx - dx, cy, rx, ry, -0.55, 0, Math.PI * 2);
   g.ellipse(cx + dx, cy, rx, ry, 0.55, 0, Math.PI * 2);
   g.fill();
   g.shadowBlur = 14;
-  g.fillStyle = "rgba(255,255,255,0.92)";
+  g.fillStyle = glowInner;
   g.beginPath();
   g.ellipse(cx - dx, cy, rx * 0.55, ry * 0.55, -0.55, 0, Math.PI * 2);
   g.ellipse(cx + dx, cy, rx * 0.55, ry * 0.55, 0.55, 0, Math.PI * 2);
@@ -175,9 +180,12 @@ const playerGlow = (() => {
   g.restore();
 
   return { canvas, ax: playerSprite.ax + pad, ay: playerSprite.ay + pad };
-})();
+};
 
-const drawPlayerSprite = (x, y, angleRad, sizePx, offroad) => {
+const playerGlowNormal = makeHeadlightGlow("normal");
+const playerGlowDanger = makeHeadlightGlow("danger");
+
+const drawPlayerSprite = (x, y, angleRad, sizePx, offroad, danger) => {
   const s = Math.max(0.001, sizePx / playerSprite.h);
   ctx.save();
   ctx.translate(x, y);
@@ -189,9 +197,15 @@ const drawPlayerSprite = (x, y, angleRad, sizePx, offroad) => {
   const beamLen = playerSprite.h * 0.95;
   const beamW = playerSprite.w * 0.26;
   const beam = ctx.createLinearGradient(0, hy, 0, hy - beamLen);
-  beam.addColorStop(0, "rgba(255,255,255,0.32)");
-  beam.addColorStop(0.25, "rgba(220,240,255,0.18)");
-  beam.addColorStop(1, "rgba(220,240,255,0)");
+  if (danger) {
+    beam.addColorStop(0, "rgba(248,113,113,0.28)");
+    beam.addColorStop(0.25, "rgba(248,113,113,0.14)");
+    beam.addColorStop(1, "rgba(248,113,113,0)");
+  } else {
+    beam.addColorStop(0, "rgba(255,255,255,0.32)");
+    beam.addColorStop(0.25, "rgba(220,240,255,0.18)");
+    beam.addColorStop(1, "rgba(220,240,255,0)");
+  }
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -208,7 +222,8 @@ const drawPlayerSprite = (x, y, angleRad, sizePx, offroad) => {
   }
   ctx.restore();
 
-  if (playerGlow) ctx.drawImage(playerGlow.canvas, -playerGlow.ax, -playerGlow.ay);
+  const glow = danger ? playerGlowDanger : playerGlowNormal;
+  if (glow) ctx.drawImage(glow.canvas, -glow.ax, -glow.ay);
   ctx.shadowColor = "rgba(0,0,0,0.65)";
   ctx.shadowBlur = 8;
   ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
@@ -858,7 +873,7 @@ const drawFinishBand = (cx, roadHalf, y) => {
   ctx.restore();
 };
 
-const drawRoadFlat = (w, h, carX, distance, heading) => {
+const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y0 = h * VIEW_Y0_T;
   const y1 = h * VIEW_Y1_T;
   const steps = 46;
@@ -993,7 +1008,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.stroke();
   ctx.globalAlpha = 1;
   const sizePx = clamp(Math.min(w, h) * 0.11, 46, 88);
-  drawPlayerSprite(carMarkerX, carMarkerY - 14, heading, sizePx, state.offroad);
+  drawPlayerSprite(carMarkerX, carMarkerY - 14, heading, sizePx, state.offroad, danger);
   ctx.restore();
 
   const fog = ctx.createLinearGradient(0, y0, 0, y1);
@@ -1005,7 +1020,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.restore();
 };
 
-const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
+const drawMiniMap = (w, h, carX, distance, offroad, heading, danger) => {
   const pad = 14;
   const mapW = Math.min(w * 0.34, 260);
   const mapH = mapW * 0.72;
@@ -1073,7 +1088,7 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const carPx = mapX(carX);
   const carPy = mapY(carT);
   const icon = clamp(mapW * 0.11, 14, 22);
-  drawPlayerSprite(carPx, carPy, Math.PI + heading, icon, offroad);
+  drawPlayerSprite(carPx, carPy, Math.PI + heading, icon, offroad, danger);
   ctx.restore();
 };
 
@@ -1508,25 +1523,12 @@ const updateSim = (t) => {
 const drawFrame = (w, h) => {
   ctx.clearRect(0, 0, w, h);
   drawSky(w, h);
+  const danger = state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs;
   const heading = sim.roadAngle + sim.heading;
-  drawRoadFlat(w, h, sim.x, sim.distance, heading);
-  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading);
+  drawRoadFlat(w, h, sim.x, sim.distance, heading, danger);
+  drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading, danger);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
-  if (state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs) {
-    const k = clamp((sim.penaltyFlashUntil - sim.elapsedMs) / 520, 0, 1);
-    ctx.save();
-    ctx.globalAlpha = 0.25 + 0.55 * k;
-    ctx.fillStyle = "rgba(248,113,113,0.55)";
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = "rgba(248,113,113,0.98)";
-    ctx.font = `${Math.max(26, Math.floor(w * 0.06))}px ui-sans-serif, system-ui`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`-${sim.lastPenaltyDelta}`, w * 0.5, h * 0.42);
-    ctx.restore();
-  }
   if (state.status === "running") drawRunUi(w, h);
   else drawSetupUi(w, h);
   if (state.status !== "running" && state.finishMs != null) {
