@@ -225,17 +225,6 @@ const drawPlayerSprite = (x, y, angleRad, sizePx, offroad, danger) => {
   const glow = danger ? playerGlowDanger : playerGlowNormal;
   if (glow) ctx.drawImage(glow.canvas, -glow.ax, -glow.ay);
 
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.95;
-  ctx.shadowBlur = 22;
-  ctx.shadowColor = danger ? "rgba(248,113,113,0.55)" : "rgba(34,211,238,0.55)";
-  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
-  ctx.shadowBlur = 18;
-  ctx.shadowColor = danger ? "rgba(255,180,180,0.45)" : "rgba(244,114,182,0.45)";
-  ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
-  ctx.restore();
-
   ctx.shadowColor = "rgba(0,0,0,0.65)";
   ctx.shadowBlur = 8;
   ctx.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
@@ -875,47 +864,13 @@ const drawSky = (w, h) => {
     ctx.fill();
   }
   ctx.restore();
-
-  const shift = (((state.distance || 0) * 0.002) % 1 + 1) % 1;
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  ctx.lineWidth = 1.25;
-  for (let i = 0; i < 26; i += 1) {
-    const tt = (i + shift) / 26;
-    const p = tt * tt;
-    const y = lerp(horizonY + 6, h, p);
-    const a = 0.02 + (1 - tt) * 0.11;
-    ctx.globalAlpha = a;
-    ctx.strokeStyle = i % 2 === 0 ? "rgba(34,211,238,0.8)" : "rgba(244,114,182,0.7)";
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 0.1;
-  ctx.strokeStyle = "rgba(34,211,238,0.8)";
-  for (let i = 0; i <= 14; i += 1) {
-    const x = lerp(-w * 0.15, w * 1.15, i / 14);
-    ctx.beginPath();
-    ctx.moveTo(w * 0.5, horizonY);
-    ctx.lineTo(x, h);
-    ctx.stroke();
-  }
-  ctx.restore();
 };
 
 const drawPostFx = (w, h) => {
   ctx.save();
-  ctx.globalCompositeOperation = "source-over";
-  ctx.globalAlpha = 0.06;
-  ctx.fillStyle = "rgba(0,0,0,0.9)";
-  for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1);
-  ctx.restore();
-
-  ctx.save();
   const v = ctx.createRadialGradient(w * 0.5, h * 0.55, Math.min(w, h) * 0.2, w * 0.5, h * 0.55, Math.max(w, h) * 0.72);
   v.addColorStop(0, "rgba(0,0,0,0)");
-  v.addColorStop(1, "rgba(0,0,0,0.55)");
+  v.addColorStop(1, "rgba(0,0,0,0.4)");
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
@@ -1015,46 +970,13 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   ctx.strokeStyle = rightEdge;
   ctx.stroke();
 
-  ctx.save();
-  ctx.globalCompositeOperation = "screen";
-  ctx.globalAlpha = 0.75;
-  ctx.lineWidth = edgeW * 2.6;
-  ctx.shadowBlur = edgeW * 10;
-  ctx.shadowColor = leftEdge;
-  ctx.beginPath();
-  ctx.moveTo(left[0][0], left[0][1]);
-  for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
-  ctx.strokeStyle = leftEdge;
-  ctx.stroke();
-  ctx.shadowColor = rightEdge;
-  ctx.beginPath();
-  ctx.moveTo(right[0][0], right[0][1]);
-  for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.strokeStyle = rightEdge;
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.lineWidth = edgeW * 3.6;
-  ctx.globalAlpha = 0.08;
-  ctx.strokeStyle = "rgba(34,211,238,0.7)";
-  ctx.beginPath();
-  ctx.moveTo(left[0][0], left[0][1]);
-  for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i][0], left[i][1]);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(244,114,182,0.7)";
-  ctx.beginPath();
-  ctx.moveTo(right[0][0], right[0][1]);
-  for (let i = 1; i < right.length; i += 1) ctx.lineTo(right[i][0], right[i][1]);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
   const stripeH = 26;
   const stripeW = 6;
   const stripeGap = 18;
   const stripePeriod = stripeH + stripeGap;
   const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
-  ctx.globalAlpha = 0.55;
-  let stripeI = 0;
+  ctx.globalAlpha = danger ? 0.55 : 0.42;
+  ctx.fillStyle = danger ? "rgba(248,113,113,0.95)" : "rgba(34,211,238,0.9)";
   for (let y = y1 + stripeShift; y > y0 - stripePeriod; y -= stripePeriod) {
     const yy = y;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
@@ -1065,15 +987,8 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
     const cx = w / 2 + c * scale;
     const elev = elevation(yWorld);
     const yAdj = clamp(yy - elev * elevScale * (1 - t * 0.15), y0, y1);
-    const stripeColor = danger
-      ? "rgba(248,113,113,0.95)"
-      : stripeI % 2 === 0
-        ? "rgba(34,211,238,0.92)"
-        : "rgba(244,114,182,0.86)";
-    ctx.fillStyle = stripeColor;
     drawRoundRect(cx - stripeW / 2, yAdj - stripeH, stripeW, stripeH, 3);
     ctx.fill();
-    stripeI += 1;
   }
   ctx.globalAlpha = 1;
 
