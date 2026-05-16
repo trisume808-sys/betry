@@ -928,6 +928,44 @@ const makeShareImage = (entry, rank) => {
       g.fillText(`好友榜 第${rank + 1}名`, pad + 28, pad + 318);
     }
 
+    const boxW = 312;
+    const boxH = 312;
+    const boxX = c.width - pad - 28 - boxW;
+    const boxY = pad + 118;
+    g.save();
+    rr(boxX, boxY, boxW, boxH, 22);
+    g.fillStyle = "rgba(9,9,16,0.55)";
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = "rgba(34,211,238,0.28)";
+    g.stroke();
+    g.clip();
+
+    const glow2 = g.createRadialGradient(
+      boxX + boxW * 0.5,
+      boxY + boxH * 0.45,
+      10,
+      boxX + boxW * 0.5,
+      boxY + boxH * 0.45,
+      boxW * 0.78,
+    );
+    glow2.addColorStop(0, "rgba(34,211,238,0.22)");
+    glow2.addColorStop(0.52, "rgba(244,114,182,0.10)");
+    glow2.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = glow2;
+    g.fillRect(boxX, boxY, boxW, boxH);
+
+    const s = Math.min((boxW * 0.62) / playerSprite.w, (boxH * 0.84) / playerSprite.h);
+    g.save();
+    g.translate(boxX + boxW / 2, boxY + boxH / 2 + 10);
+    g.rotate(-0.18);
+    g.scale(s, s);
+    g.shadowColor = "rgba(0,0,0,0.62)";
+    g.shadowBlur = 14;
+    g.drawImage(playerSprite.canvas, -playerSprite.ax, -playerSprite.ay);
+    g.restore();
+    g.restore();
+
     g.globalAlpha = 0.6;
     g.fillStyle = "rgba(34,211,238,0.22)";
     rr(pad + 28, c.height - pad - 64, c.width - pad * 2 - 56, 36, 18);
