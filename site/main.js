@@ -129,8 +129,11 @@ const createHypercarSprite = ({ width = 56, height = 112, scale = 2 } = {}) => {
   const shadowGrad = g.createRadialGradient(w * 0.5, h * 0.58, w * 0.12, w * 0.5, h * 0.58, w * 0.5);
   shadowGrad.addColorStop(0, "rgba(0,0,0,0)");
   shadowGrad.addColorStop(1, "rgba(0,0,0,0.22)");
+  g.save();
+  g.globalCompositeOperation = "source-atop";
   g.fillStyle = shadowGrad;
   g.fillRect(0, 0, w, h);
+  g.restore();
 
   return { canvas: off, w, h, ax: w / 2, ay: h / 2 };
 };
