@@ -151,6 +151,120 @@
         font-size: 12px;
         line-height: 1.6;
       }
+
+      #shareOverlay[hidden] {
+        display: none;
+      }
+
+      #shareOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      #shareBackdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+      }
+
+      #sharePanel {
+        position: relative;
+        width: min(560px, 100%);
+        max-height: 78vh;
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid rgba(34, 211, 238, 0.28);
+        background: rgba(10, 10, 18, 0.92);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+        padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+      }
+
+      #shareHeader {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(39, 39, 42, 0.9);
+      }
+
+      #shareTitle {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      #shareClose {
+        border: 0;
+        border-radius: 12px;
+        background: rgba(24, 24, 27, 0.9);
+        color: rgba(244, 244, 245, 0.95);
+        font-size: 12px;
+        padding: 8px 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      #shareClose:hover {
+        background: rgba(39, 39, 42, 0.9);
+      }
+
+      #shareImg {
+        display: block;
+        width: 100%;
+        border-radius: 14px;
+        margin-top: 12px;
+        border: 1px solid rgba(63, 63, 70, 0.7);
+        background: rgba(0, 0, 0, 0.25);
+      }
+
+      #shareText {
+        width: 100%;
+        margin-top: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(63, 63, 70, 0.7);
+        background: rgba(9, 9, 11, 0.6);
+        color: rgba(244, 244, 245, 0.92);
+        padding: 10px 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        min-height: 92px;
+        resize: none;
+        outline: none;
+      }
+
+      #shareActions {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .shareBtn {
+        flex: 1;
+        border: 1px solid rgba(34, 211, 238, 0.28);
+        border-radius: 14px;
+        background: rgba(10, 10, 18, 0.72);
+        color: rgba(167, 243, 208, 0.95);
+        padding: 10px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .shareBtn.primary {
+        border: 0;
+        background: rgba(34, 211, 238, 0.92);
+        color: rgba(9, 9, 11, 0.95);
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -198,6 +312,21 @@
         </div>
       </div>
     </div>
+    <div id="shareOverlay" hidden>
+      <button id="shareBackdrop" type="button" aria-label="关闭分享"></button>
+      <div id="sharePanel" role="dialog" aria-modal="true">
+        <div id="shareHeader">
+          <div id="shareTitle">分享成绩</div>
+          <button id="shareClose" type="button">关闭</button>
+        </div>
+        <img id="shareImg" alt="成绩卡片" />
+        <textarea id="shareText" readonly></textarea>
+        <div id="shareActions">
+          <button class="shareBtn" id="shareCopy" type="button">复制文案</button>
+          <button class="shareBtn primary" id="shareDownload" type="button">下载卡片</button>
+        </div>
+      </div>
+    </div>
     <div id="wrap">
       <canvas id="game"></canvas>
     </div>
@@ -221,6 +350,59 @@
       window.addEventListener("keydown", (e) => {
         if (e.key === "Escape") close();
       });
+
+      const shareOverlay = document.getElementById("shareOverlay");
+      const shareBackdrop = document.getElementById("shareBackdrop");
+      const shareClose = document.getElementById("shareClose");
+      const shareImg = document.getElementById("shareImg");
+      const shareText = document.getElementById("shareText");
+      const shareCopy = document.getElementById("shareCopy");
+      const shareDownload = document.getElementById("shareDownload");
+
+      const openShare = (detail) => {
+        if (!shareOverlay) return;
+        if (shareText) shareText.value = String(detail?.text ?? "");
+        if (shareImg) shareImg.src = String(detail?.image ?? "");
+        shareOverlay.hidden = false;
+      };
+
+      const closeShare = () => {
+        if (!shareOverlay) return;
+        shareOverlay.hidden = true;
+      };
+
+      shareBackdrop?.addEventListener("click", closeShare);
+      shareClose?.addEventListener("click", closeShare);
+
+      shareCopy?.addEventListener("click", async () => {
+        const text = shareText?.value ?? "";
+        try {
+          await navigator.clipboard.writeText(text);
+          return;
+        } catch {
+          if (!shareText) return;
+          shareText.focus();
+          shareText.select();
+          try {
+            document.execCommand("copy");
+          } catch {
+            return;
+          }
+        }
+      });
+
+      shareDownload?.addEventListener("click", () => {
+        const src = shareImg?.getAttribute("src") ?? "";
+        if (!src) return;
+        const a = document.createElement("a");
+        a.href = src;
+        a.download = "score.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+
+      window.addEventListener("betry:share", (e) => openShare(e.detail));
     </script>
     <script type="module" src="./main.js?v=20260517-15"></script>
   </body>

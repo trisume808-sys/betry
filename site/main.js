@@ -335,6 +335,8 @@ const state = {
   score: 0,
   finishMs: null,
   animMs: 0,
+  playerName: "你",
+  lastResult: null,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
 
@@ -655,7 +657,7 @@ const onPointerDown = (e) => {
     }
   }
 
-  for (const key of ["track1", "trackMid", "track2", "enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
+  for (const key of ["track1", "trackMid", "track2", "enable", "calibrate", "start", "touch", "fs", "exitfs", "again", "share", "back"]) {
     const r = ui.rects.get(key);
     if (r && hit(p.x, p.y, r)) {
       handleButton(key);
@@ -724,6 +726,13 @@ const handleButton = (key) => {
   if (key === "touch") setInputTouch();
   if (key === "fs") toggleFullscreenLandscape();
   if (key === "exitfs") exitFullscreen();
+  if (key === "again") startRun();
+  if (key === "share" && state.lastResult) openShare(state.lastResult);
+  if (key === "back") {
+    state.finishMs = null;
+    state.lastResult = null;
+    state.status = "setup";
+  }
 };
 
 const formatMs = (ms) => {
@@ -731,6 +740,215 @@ const formatMs = (ms) => {
   const m = Math.floor(s / 60);
   const r = s - m * 60;
   return `${m}:${r.toFixed(2).padStart(5, "0")}`;
+};
+
+const storage = {
+  scores: "betry_scores_v1",
+  friends: "betry_friends_v1",
+};
+
+const safeParse = (raw, fallback) => {
+  try {
+    if (typeof raw !== "string" || !raw) return fallback;
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+};
+
+const safeGet = (key, fallback) => {
+  try {
+    return safeParse(localStorage.getItem(key), fallback);
+  } catch {
+    return fallback;
+  }
+};
+
+const safeSet = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    return;
+  }
+};
+
+const hash32 = (s) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+const makeRng = (seed0) => {
+  let seed = seed0 >>> 0;
+  return () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+};
+
+const friendNames = ["Astra", "Neo", "Kira", "Luna", "Zed", "Momo", "Rin", "Kai"];
+
+const getFriends = (trackId) => {
+  const all = safeGet(storage.friends, {});
+  if (Array.isArray(all?.[trackId]) && all[trackId].length) return all[trackId];
+  const rng = makeRng(hash32(`friends:${trackId}`));
+  const list = friendNames.slice(0, 6).map((name) => {
+    const penalty = Math.floor(rng() * 26);
+    const timeMs = Math.floor(52000 + rng() * 52000);
+    const score = calcScore(timeMs, penalty);
+    return {
+      id: `f_${trackId}_${hash32(name)}`,
+      name,
+      trackId,
+      score,
+      timeMs,
+      penalty,
+      ts: 0,
+      kind: "friend",
+    };
+  });
+  all[trackId] = list;
+  safeSet(storage.friends, all);
+  return list;
+};
+
+const recordScore = (entry) => {
+  const list = safeGet(storage.scores, []);
+  const arr = Array.isArray(list) ? list : [];
+  arr.unshift(entry);
+  safeSet(storage.scores, arr.slice(0, 50));
+};
+
+const getMyScores = (trackId) => {
+  const list = safeGet(storage.scores, []);
+  if (!Array.isArray(list)) return [];
+  return list.filter((x) => x && x.trackId === trackId && x.kind === "me");
+};
+
+const getLeaderboard = (trackId, lastEntry) => {
+  const friends = getFriends(trackId);
+  const mine = getMyScores(trackId);
+  const items = [...friends, ...mine];
+  if (lastEntry) items.push(lastEntry);
+  const uniq = new Map();
+  for (const it of items) {
+    if (!it || !it.id) continue;
+    if (!uniq.has(it.id)) uniq.set(it.id, it);
+  }
+  const rows = Array.from(uniq.values());
+  rows.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if ((a.timeMs ?? 0) !== (b.timeMs ?? 0)) return (a.timeMs ?? 0) - (b.timeMs ?? 0);
+    return (b.ts ?? 0) - (a.ts ?? 0);
+  });
+  return rows.slice(0, 8);
+};
+
+const makeShareText = (entry, rank) => {
+  const trackLabel = getTrack().name ?? state.trackId;
+  const time = entry?.timeMs != null ? formatMs(entry.timeMs) : "";
+  const score = entry?.score ?? 0;
+  const penalty = entry?.penalty ?? 0;
+  const rk = typeof rank === "number" ? `第${rank + 1}名` : "";
+  return `零点漂移｜${trackLabel}｜得分 ${score}｜用时 ${time}｜扣分 ${penalty}${rk ? `｜好友榜 ${rk}` : ""}`;
+};
+
+const makeShareImage = (entry, rank) => {
+  try {
+    const c = document.createElement("canvas");
+    c.width = 960;
+    c.height = 540;
+    const g = c.getContext("2d");
+    if (!g) return "";
+    const rr = (x, y, w, h, r) => {
+      const rr0 = Math.min(r, w / 2, h / 2);
+      g.beginPath();
+      g.moveTo(x + rr0, y);
+      g.lineTo(x + w - rr0, y);
+      g.quadraticCurveTo(x + w, y, x + w, y + rr0);
+      g.lineTo(x + w, y + h - rr0);
+      g.quadraticCurveTo(x + w, y + h, x + w - rr0, y + h);
+      g.lineTo(x + rr0, y + h);
+      g.quadraticCurveTo(x, y + h, x, y + h - rr0);
+      g.lineTo(x, y + rr0);
+      g.quadraticCurveTo(x, y, x + rr0, y);
+      g.closePath();
+    };
+
+    const bg = g.createLinearGradient(0, 0, 0, c.height);
+    bg.addColorStop(0, "#050510");
+    bg.addColorStop(1, "#09091a");
+    g.fillStyle = bg;
+    g.fillRect(0, 0, c.width, c.height);
+
+    const glow = g.createRadialGradient(c.width * 0.42, c.height * 0.35, 20, c.width * 0.42, c.height * 0.35, c.width * 0.7);
+    glow.addColorStop(0, "rgba(34,211,238,0.18)");
+    glow.addColorStop(0.55, "rgba(244,114,182,0.08)");
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = glow;
+    g.fillRect(0, 0, c.width, c.height);
+
+    const pad = 42;
+    rr(pad, pad, c.width - pad * 2, c.height - pad * 2, 26);
+    g.fillStyle = "rgba(10,10,18,0.72)";
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = "rgba(34,211,238,0.28)";
+    g.stroke();
+
+    g.font = "700 44px ui-sans-serif, system-ui";
+    g.textAlign = "left";
+    g.textBaseline = "alphabetic";
+    g.fillStyle = "rgba(240,253,255,0.92)";
+    g.fillText("零点漂移", pad + 28, pad + 72);
+
+    const trackLabel = getTrack().name ?? state.trackId;
+    g.font = "600 20px ui-sans-serif, system-ui";
+    g.fillStyle = "rgba(167,243,208,0.92)";
+    g.fillText(String(trackLabel), pad + 28, pad + 106);
+
+    const score = entry?.score ?? 0;
+    const time = entry?.timeMs != null ? formatMs(entry.timeMs) : "";
+    const penalty = entry?.penalty ?? 0;
+    g.font = "700 56px ui-sans-serif, system-ui";
+    g.fillStyle = "rgba(34,211,238,0.92)";
+    g.fillText(`得分 ${score}`, pad + 28, pad + 182);
+
+    g.font = "600 26px ui-sans-serif, system-ui";
+    g.fillStyle = "rgba(226,232,240,0.86)";
+    g.fillText(`用时 ${time}`, pad + 28, pad + 232);
+    g.fillText(`扣分 ${penalty}`, pad + 28, pad + 272);
+
+    if (typeof rank === "number") {
+      g.font = "700 26px ui-sans-serif, system-ui";
+      g.fillStyle = "rgba(244,114,182,0.9)";
+      g.fillText(`好友榜 第${rank + 1}名`, pad + 28, pad + 318);
+    }
+
+    g.globalAlpha = 0.6;
+    g.fillStyle = "rgba(34,211,238,0.22)";
+    rr(pad + 28, c.height - pad - 64, c.width - pad * 2 - 56, 36, 18);
+    g.fill();
+    g.globalAlpha = 1;
+    g.font = "600 16px ui-sans-serif, system-ui";
+    g.fillStyle = "rgba(226,232,240,0.75)";
+    g.fillText("扫码进入，挑战你的好友榜", pad + 44, c.height - pad - 38);
+
+    return c.toDataURL("image/png");
+  } catch {
+    return "";
+  }
+};
+
+const openShare = (entry) => {
+  const list = getLeaderboard(entry.trackId, entry);
+  const idx = list.findIndex((x) => x && x.id === entry.id);
+  const text = makeShareText(entry, idx >= 0 ? idx : undefined);
+  const image = makeShareImage(entry, idx >= 0 ? idx : undefined);
+  window.dispatchEvent(new CustomEvent("betry:share", { detail: { text, image } }));
 };
 
 const drawRoundRect = (x, y, w, h, r) => {
@@ -1485,6 +1703,91 @@ const drawSetupUi = (w, h) => {
   ctx.restore();
 };
 
+const drawResultUi = (w, h) => {
+  ui.rects.clear();
+  const entry = state.lastResult;
+  if (!entry) return;
+
+  const pad = Math.max(14, Math.floor(w * 0.03));
+  const panelW = Math.min(w - pad * 2, 560);
+  const panelH = Math.min(h - pad * 2, 620);
+  const x0 = (w - panelW) / 2;
+  const y0 = (h - panelH) / 2;
+
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(10,10,18,0.76)";
+  drawRoundRect(x0, y0, panelW, panelH, 22);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(34,211,238,0.24)";
+  ctx.stroke();
+
+  const titleFs = Math.max(18, Math.floor(Math.min(w, h) * 0.05));
+  const subFs = Math.max(12, Math.floor(Math.min(w, h) * 0.025));
+  const metricFs = Math.max(13, Math.floor(Math.min(w, h) * 0.03));
+  const innerPad = 18;
+
+  ctx.fillStyle = "rgba(244,253,255,0.92)";
+  ctx.font = `700 ${titleFs}px ui-sans-serif, system-ui`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("完成", x0 + innerPad, y0 + 42);
+
+  ctx.fillStyle = "rgba(167,243,208,0.92)";
+  ctx.font = `600 ${subFs}px ui-sans-serif, system-ui`;
+  ctx.fillText(`${getTrack().name ?? state.trackId}`, x0 + innerPad, y0 + 68);
+
+  ctx.fillStyle = "rgba(34,211,238,0.92)";
+  ctx.font = `700 ${Math.floor(titleFs * 0.92)}px ui-sans-serif, system-ui`;
+  ctx.fillText(`得分 ${entry.score}`, x0 + innerPad, y0 + 110);
+
+  ctx.fillStyle = "rgba(226,232,240,0.86)";
+  ctx.font = `600 ${metricFs}px ui-sans-serif, system-ui`;
+  ctx.fillText(`用时 ${formatMs(entry.timeMs)}`, x0 + innerPad, y0 + 148);
+  ctx.fillText(`扣分 ${entry.penalty}`, x0 + innerPad, y0 + 182);
+
+  const list = getLeaderboard(entry.trackId, entry);
+  const myIndex = list.findIndex((x) => x && x.id === entry.id);
+  const rankText = myIndex >= 0 ? `好友榜 第${myIndex + 1}名` : "";
+  if (rankText) {
+    ctx.fillStyle = "rgba(244,114,182,0.9)";
+    ctx.font = `700 ${metricFs}px ui-sans-serif, system-ui`;
+    ctx.fillText(rankText, x0 + innerPad, y0 + 220);
+  }
+
+  const tableY = y0 + 244;
+  const rowH = 34;
+  const btnW = panelW - innerPad * 2;
+  const btnH = 44;
+  const btnGap = 10;
+  const btnBlockH = btnH * 3 + btnGap * 2;
+  const btnY = y0 + panelH - innerPad - btnBlockH;
+  const maxRows = Math.min(6, list.length, Math.max(0, Math.floor((btnY - 12 - tableY) / rowH)));
+  ctx.font = `600 ${subFs}px ui-sans-serif, system-ui`;
+  for (let i = 0; i < maxRows; i += 1) {
+    const r = list[i];
+    const yy = tableY + i * rowH;
+    const isMe = r.kind === "me" && r.id === entry.id;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = isMe ? "rgba(34,211,238,0.14)" : "rgba(24,24,27,0.55)";
+    drawRoundRect(x0 + innerPad, yy, panelW - innerPad * 2, rowH - 6, 14);
+    ctx.fill();
+    ctx.fillStyle = isMe ? "rgba(34,211,238,0.92)" : "rgba(226,232,240,0.85)";
+    ctx.textAlign = "left";
+    ctx.fillText(`#${i + 1} ${r.name}`, x0 + innerPad + 12, yy + 22);
+    ctx.textAlign = "right";
+    ctx.fillStyle = isMe ? "rgba(244,253,255,0.92)" : "rgba(167,243,208,0.9)";
+    ctx.fillText(`${r.score}`, x0 + panelW - innerPad - 12, yy + 22);
+  }
+
+  drawButton("share", "分享成绩", { x: x0 + innerPad, y: btnY, w: btnW, h: btnH }, "ghost");
+  drawButton("again", "再来一局", { x: x0 + innerPad, y: btnY + btnH + btnGap, w: btnW, h: btnH }, "primary");
+  drawButton("back", "返回设置", { x: x0 + innerPad, y: btnY + (btnH + btnGap) * 2, w: btnW, h: btnH }, "ghost");
+
+  ctx.restore();
+};
+
 const drawRunUi = (w, h) => {
   ui.rects.clear();
   const pad = 14;
@@ -1575,7 +1878,20 @@ const updateSim = (t) => {
       sim.distance = fd;
       if (state.finishMs == null) state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
       state.score = calcScore(state.finishMs, state.penalty);
-      state.status = "setup";
+      const ts = Date.now();
+      const entry = {
+        id: `me_${ts}`,
+        name: state.playerName,
+        trackId: state.trackId,
+        score: state.score,
+        timeMs: state.finishMs,
+        penalty: state.penalty,
+        ts,
+        kind: "me",
+      };
+      state.lastResult = entry;
+      recordScore(entry);
+      state.status = "result";
     }
   }
 
@@ -1619,40 +1935,8 @@ const drawFrame = (w, h) => {
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
   if (state.status === "running") drawRunUi(w, h);
+  else if (state.status === "result") drawResultUi(w, h);
   else drawSetupUi(w, h);
-  if (state.status !== "running" && state.finishMs != null) {
-    ctx.save();
-    const scoreFs = Math.max(34, Math.floor(w * 0.08));
-    const statsFs = Math.max(14, Math.floor(w * 0.022));
-    const hudPad = 14;
-    const hudH = 92;
-    const topY = hudPad + hudH + 10;
-    const gap = Math.max(10, Math.floor(scoreFs * 0.14));
-    const cardPadX = 18;
-    const cardPadY = 14;
-    const bw = Math.min(w * 0.84, 560);
-    const bh = Math.floor(cardPadY * 2 + scoreFs * 1.02 + gap + statsFs * 1.35);
-    const bx = (w - bw) / 2;
-    const by = topY;
-    ctx.globalAlpha = 0.82;
-    ctx.fillStyle = "rgba(10,10,18,0.72)";
-    drawRoundRect(bx, by, bw, bh, 22);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "rgba(52,211,153,0.98)";
-    ctx.font = `${scoreFs}px ui-sans-serif, system-ui`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`得分 ${state.score}`, w * 0.5, by + cardPadY + scoreFs * 0.56);
-    ctx.fillStyle = "rgba(244,244,245,0.9)";
-    ctx.font = `${statsFs}px ui-sans-serif, system-ui`;
-    ctx.fillText(
-      `用时 ${formatMs(state.finishMs)}   扣分 ${state.penalty}`,
-      w * 0.5,
-      by + cardPadY + scoreFs * 1.02 + gap + statsFs * 0.6,
-    );
-    ctx.restore();
-  }
   drawPostFx(w, h);
   drawFullscreenExitOverlay(w, h);
 };
