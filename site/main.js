@@ -6,6 +6,9 @@ const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
 const WALL_HIT_EPS_PX = 1;
+const VIEW_Y0_T = 0.1;
+const VIEW_Y1_T = 0.92;
+const CAR_MARKER_Y_T = 0.74;
 
 const roundRectPath = (g, x, y, w, h, r) => {
   const rr = Math.min(r, w / 2, h / 2);
@@ -832,8 +835,8 @@ const drawFinishBand = (cx, roadHalf, y) => {
 };
 
 const drawRoadFlat = (w, h, carX, distance, heading) => {
-  const y0 = h * 0.16;
-  const y1 = h * 0.9;
+  const y0 = h * VIEW_Y0_T;
+  const y1 = h * VIEW_Y1_T;
   const steps = 46;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
@@ -953,7 +956,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
     drawFinishBand(cx, roadHalfPx, y);
   }
 
-  const carMarkerY = h * 0.74;
+  const carMarkerY = h * CAR_MARKER_Y_T;
   const carMarkerX = w / 2;
   
   ctx.save();
@@ -1108,7 +1111,7 @@ const drawCockpit = (w, h, offroad) => {
 const drawTopHud = (w, h) => {
   const pad = 14;
   const boxW = Math.min(w * 0.44, 320);
-  const boxH = 92;
+  const boxH = 98;
   const fd = getTrack().finishDistance;
   const progress = fd > 0 ? clamp(state.distance / fd, 0, 1) : 0;
 
@@ -1131,21 +1134,30 @@ const drawTopHud = (w, h) => {
   ctx.textBaseline = "alphabetic";
   ctx.fillText("陀螺仪赛车", pad + 14, pad + 24);
 
+  ctx.fillStyle = "rgba(226,232,240,0.78)";
+  ctx.textAlign = "right";
+  ctx.fillText(
+    state.status === "running" ? formatMs(state.elapsedMs) : state.finishMs != null ? formatMs(state.finishMs) : "",
+    pad + boxW - 14,
+    pad + 24,
+  );
+  ctx.textAlign = "left";
+
   ctx.fillStyle = "rgba(34,211,238,0.92)";
   ctx.font = `${Math.max(20, Math.floor(w * 0.05))}px ui-sans-serif, system-ui`;
-  ctx.fillText(`${Math.round(state.speed)}`, pad + 14, pad + 62);
+  ctx.fillText(`${Math.round(state.speed)}`, pad + 14, pad + 66);
 
   ctx.fillStyle = "rgba(161,161,170,0.95)";
   ctx.font = `${Math.max(11, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
-  ctx.fillText("SPEED", pad + 14 + Math.max(44, Math.floor(w * 0.1)), pad + 62);
+  ctx.fillText("SPEED", pad + 14 + Math.max(44, Math.floor(w * 0.1)), pad + 66);
 
   ctx.fillStyle = "rgba(244,114,182,0.90)";
   ctx.font = `${Math.max(12, Math.floor(w * 0.022))}px ui-sans-serif, system-ui`;
-  ctx.fillText(`SCORE ${state.score}`, pad + 14, pad + 82);
+  ctx.fillText(`SCORE ${state.score}`, pad + 14, pad + 88);
 
   if (state.offroad) {
     ctx.fillStyle = "rgba(248,113,113,0.92)";
-    ctx.fillText("OFFROAD", pad + 14 + Math.max(120, Math.floor(w * 0.18)), pad + 82);
+    ctx.fillText("OFFROAD", pad + 14 + Math.max(120, Math.floor(w * 0.18)), pad + 88);
   }
 
   const barW = Math.min(w * 0.42, 320);
@@ -1313,20 +1325,6 @@ const drawSetupUi = (w, h) => {
 const drawRunUi = (w, h) => {
   ui.rects.clear();
   const pad = 14;
-  const boxW = Math.min(w * 0.42, 270);
-  ctx.save();
-  ctx.fillStyle = "rgba(10,10,18,0.55)";
-  drawRoundRect(pad, pad + 62, boxW, 68, 16);
-  ctx.fill();
-  ctx.fillStyle = "rgba(244,244,245,0.9)";
-  ctx.font = `${Math.max(12, Math.floor(w * 0.018))}px ui-sans-serif, system-ui`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(`计时 ${formatMs(state.finishMs ?? state.elapsedMs)}`, pad + 12, pad + 92);
-  ctx.fillStyle = "rgba(52,211,153,0.95)";
-  ctx.font = `${Math.max(14, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
-  ctx.fillText(`得分 ${state.score}`, pad + 12, pad + 118);
-  ctx.restore();
 
   const btnW = Math.min(w * 0.6, 360);
   const btnH = 44;
@@ -1369,9 +1367,9 @@ const updateSim = (t) => {
 
     const baseSpeed = getTrack().baseSpeed;
     const fd = getTrack().finishDistance;
-    const y0 = h * 0.16;
-    const y1 = h * 0.9;
-    const carMarkerY = h * 0.74;
+    const y0 = h * VIEW_Y0_T;
+    const y1 = h * VIEW_Y1_T;
+    const carMarkerY = h * CAR_MARKER_Y_T;
     const lookahead = 1100;
     const carT = clamp((y1 - carMarkerY) / (y1 - y0), 0, 1);
     const yCarWorld = sim.distance + carT * lookahead;
@@ -1422,9 +1420,9 @@ const updateSim = (t) => {
     }
   }
 
-  const y0 = h * 0.16;
-  const y1 = h * 0.9;
-  const carMarkerY = h * 0.74;
+  const y0 = h * VIEW_Y0_T;
+  const y1 = h * VIEW_Y1_T;
+  const carMarkerY = h * CAR_MARKER_Y_T;
   const lookahead = 1100;
   const carT = clamp((y1 - carMarkerY) / (y1 - y0), 0, 1);
   const yCarWorldNow = sim.distance + carT * lookahead;
