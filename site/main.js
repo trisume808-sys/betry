@@ -1,7 +1,25 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => {
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
 
-const centerX = (y) => 110 * Math.sin(y * 0.0022) + 70 * Math.sin(y * 0.0011 + 1.7);
+const centerX = (y) => {
+  const base = 50 * Math.sin(y * 0.0011) + 28 * Math.sin(y * 0.0023 + 1.7);
+  const a = 240;
+  const y1 = 520;
+  const y2 = 900;
+  const y3 = 1280;
+  const s1 = smoothstep(260, y1, y);
+  const s2 = smoothstep(y1, y2, y);
+  const s3 = smoothstep(y2, y3, y);
+  const bend1 = lerp(0, a, s1);
+  const bend2 = lerp(a, -a, s2);
+  const bend3 = lerp(-a, 0, s3);
+  const bends = y < y1 ? bend1 : y < y2 ? bend2 : bend3;
+  return base + bends;
+};
 const halfWidth = (y) => 135 + 18 * Math.sin(y * 0.0007 + 0.5);
 
 const state = {
@@ -57,7 +75,7 @@ const touch = {
   steer: 0,
 };
 
-const finishDistance = 1800;
+const finishDistance = 3200;
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
