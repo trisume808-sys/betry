@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-8";
+const BUILD_ID = "20260516-9";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -232,6 +232,8 @@ const resetRun = () => {
   sim.gyroFlip = 1;
   sim.nextGyroFlipMs = randRange(2500, 6500);
   sim.lastPenaltyMs = 0;
+  sim.penaltyFlashUntil = 0;
+  sim.lastPenaltyDelta = 0;
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
