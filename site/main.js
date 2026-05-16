@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-15";
+const BUILD_ID = "20260516-16";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -848,8 +848,8 @@ const drawSetupUi = (w, h) => {
   const pad = Math.max(14, Math.floor(w * 0.03));
   const panelW = Math.min(w - pad * 2, 540);
   const x0 = (w - panelW) / 2;
-  const y0 = portrait ? Math.floor(h * 0.18) : Math.floor(h * 0.62);
-  const panelH = portrait ? Math.min(Math.floor(h * 0.72), 560) : h - y0 - pad;
+  const y0 = portrait ? Math.floor(h * (state.finishMs != null ? 0.34 : 0.18)) : Math.floor(h * 0.62);
+  const panelH = portrait ? Math.min(h - y0 - pad, 560) : h - y0 - pad;
 
   ctx.save();
   const bg = ctx.createLinearGradient(0, y0, 0, y0 + panelH);
@@ -1105,27 +1105,35 @@ const drawFrame = (w, h) => {
   else drawSetupUi(w, h);
   if (state.status !== "running" && state.finishMs != null) {
     ctx.save();
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = "rgba(10,10,18,0.72)";
-    const bw = Math.min(w * 0.78, 520);
-    const bh = Math.min(h * 0.18, 170);
+    const scoreFs = Math.max(34, Math.floor(w * 0.08));
+    const statsFs = Math.max(14, Math.floor(w * 0.022));
+    const hudPad = 14;
+    const hudH = 92;
+    const topY = hudPad + hudH + 10;
+    const gap = Math.max(10, Math.floor(scoreFs * 0.14));
+    const cardPadX = 18;
+    const cardPadY = 14;
+    const bw = Math.min(w * 0.84, 560);
+    const bh = Math.floor(cardPadY * 2 + scoreFs * 1.02 + gap + statsFs * 1.35);
     const bx = (w - bw) / 2;
-    const by = h * 0.32;
+    const by = topY;
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = "rgba(10,10,18,0.72)";
     drawRoundRect(bx, by, bw, bh, 22);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = "rgba(52,211,153,0.98)";
-    const scoreFs = Math.max(34, Math.floor(w * 0.08));
     ctx.font = `${scoreFs}px ui-sans-serif, system-ui`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const hudPad = 14;
-    const hudH = 92;
-    const scoreY = Math.max(scoreFs * 0.85, hudPad + hudH + scoreFs * 0.75);
-    ctx.fillText(`得分 ${state.score}`, w * 0.5, scoreY);
+    ctx.fillText(`得分 ${state.score}`, w * 0.5, by + cardPadY + scoreFs * 0.56);
     ctx.fillStyle = "rgba(244,244,245,0.9)";
-    ctx.font = `${Math.max(14, Math.floor(w * 0.022))}px ui-sans-serif, system-ui`;
-    ctx.fillText(`用时 ${formatMs(state.finishMs)}   扣分 ${state.penalty}`, w * 0.5, by + bh * 0.56);
+    ctx.font = `${statsFs}px ui-sans-serif, system-ui`;
+    ctx.fillText(
+      `用时 ${formatMs(state.finishMs)}   扣分 ${state.penalty}`,
+      w * 0.5,
+      by + cardPadY + scoreFs * 1.02 + gap + statsFs * 0.6,
+    );
     ctx.restore();
   }
 };
