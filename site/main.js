@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-1";
+const BUILD_ID = "20260516-2";
 
 const track = {
   halfWidth: 250,
@@ -58,6 +58,7 @@ const state = {
   distance: 0,
   speed: 0,
   offroad: false,
+  penalty: 0,
   finishMs: null,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
@@ -79,6 +80,7 @@ const sim = {
   steerAngle: 0,
   gyroFlip: 1,
   nextGyroFlipMs: 0,
+  lastPenaltyMs: 0,
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -210,6 +212,7 @@ const resetRun = () => {
   state.distance = 0;
   state.speed = 0;
   state.offroad = false;
+  state.penalty = 0;
   state.tiltSmooth = 0;
   sim.x = 0;
   sim.heading = 0;
@@ -220,6 +223,7 @@ const resetRun = () => {
   sim.steerAngle = 0;
   sim.gyroFlip = 1;
   sim.nextGyroFlipMs = randRange(2500, 6500);
+  sim.lastPenaltyMs = 0;
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
@@ -841,13 +845,16 @@ const drawRunUi = (w, h) => {
   const boxW = Math.min(w * 0.42, 270);
   ctx.save();
   ctx.fillStyle = "rgba(10,10,18,0.55)";
-  drawRoundRect(pad, pad + 62, boxW, 44, 16);
+  drawRoundRect(pad, pad + 62, boxW, 68, 16);
   ctx.fill();
   ctx.fillStyle = "rgba(244,244,245,0.9)";
   ctx.font = `${Math.max(12, Math.floor(w * 0.018))}px ui-sans-serif, system-ui`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(`计时 ${formatMs(state.finishMs ?? state.elapsedMs)}`, pad + 12, pad + 92);
+  ctx.fillStyle = "rgba(161,161,170,0.9)";
+  ctx.font = `${Math.max(11, Math.floor(w * 0.017))}px ui-sans-serif, system-ui`;
+  ctx.fillText(`扣分 ${state.penalty}`, pad + 12, pad + 114);
   ctx.restore();
 
   const btnW = Math.min(w * 0.6, 360);
@@ -899,7 +906,7 @@ const updateSim = (t) => {
     const hw = halfWidth(y);
     const roadHalfPx = Math.min(w * 0.28, 240);
     const scale = roadHalfPx / Math.max(1, hw);
-    const carHalfPx = 10;
+    const carHalfPx = 14;
     const carHalf = carHalfPx / Math.max(0.001, scale);
     const offroad = Math.abs(sim.x - c) > hw - carHalf;
     const speed = baseSpeed * (offroad ? 0.55 : 1);
@@ -918,9 +925,14 @@ const updateSim = (t) => {
     const nhw = halfWidth(ny);
     const nscale = roadHalfPx / Math.max(1, nhw);
     const ncarHalf = carHalfPx / Math.max(0.001, nscale);
-    if (Math.abs(sim.x - nc) > nhw - ncarHalf) {
-      sim.x = nc + clamp(sim.x - nc, -(nhw - ncarHalf), nhw - ncarHalf);
+    const limit = nhw - ncarHalf;
+    const nx = sim.x - nc;
+    const hit = Math.abs(nx) > limit + 1e-6;
+    if (hit && sim.elapsedMs - sim.lastPenaltyMs > 220) {
+      sim.lastPenaltyMs = sim.elapsedMs;
+      state.penalty += 1;
     }
+    sim.x = nc + clamp(nx, -limit, limit);
 
     if (sim.distance >= finishDistance) {
       sim.distance = finishDistance;
@@ -934,9 +946,9 @@ const updateSim = (t) => {
   const hwNow = halfWidth(yNow);
   const roadHalfPxNow = Math.min(w * 0.28, 240);
   const scaleNow = roadHalfPxNow / Math.max(1, hwNow);
-  const carHalfPxNow = 10;
+  const carHalfPxNow = 14;
   const carHalfNow = carHalfPxNow / Math.max(0.001, scaleNow);
-  const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > hwNow - carHalfNow;
+  const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) >= hwNow - carHalfNow - 1e-6;
   const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
   sim.roadAngle = roadAngleAt(yNow);
 
@@ -944,6 +956,7 @@ const updateSim = (t) => {
   state.distance = sim.distance;
   state.speed = speedNow;
   state.offroad = offroadNow;
+  state.penalty = Math.max(0, Math.floor(state.penalty));
 
   drawFrame(w, h);
 };
