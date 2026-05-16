@@ -6,7 +6,7 @@ const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
 const WALL_HIT_EPS_PX = 1;
-const VIEW_Y0_T = 0.1;
+const VIEW_Y0_T = 0;
 const VIEW_Y1_T = 0.92;
 const CAR_MARKER_Y_T = 0.74;
 
