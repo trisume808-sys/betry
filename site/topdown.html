@@ -2,12 +2,9 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#050508" />
-    <title>陀螺仪赛车 MVP</title>
+    <title>Top-Down Canvas Demo</title>
     <style>
       html,
       body {
@@ -17,21 +14,32 @@
         color: #e4e4e7;
         overflow: hidden;
         touch-action: none;
+        font-family: ui-sans-serif, system-ui;
       }
-
       #wrap {
         position: fixed;
         inset: 0;
       }
-
       canvas {
         width: 100%;
         height: 100%;
         display: block;
         touch-action: none;
       }
-
-      .link {
+      .hud {
+        position: fixed;
+        left: 12px;
+        top: 12px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(10, 10, 18, 0.62);
+        backdrop-filter: blur(10px);
+        font-size: 12px;
+        line-height: 1.35;
+        user-select: none;
+        pointer-events: none;
+      }
+      .back {
         position: fixed;
         right: 12px;
         top: 12px;
@@ -46,10 +54,12 @@
     </style>
   </head>
   <body>
-    <a class="link" href="./topdown.html">俯视超跑</a>
+    <a class="back" href="./index.html">返回</a>
+    <div class="hud">WASD/方向键，或按住拖动（按住=加速）</div>
     <div id="wrap">
       <canvas id="game"></canvas>
     </div>
-    <script type="module" src="./main.js?v=20260516-20"></script>
+    <script type="module" src="./topdown.js?v=20260517-1"></script>
   </body>
 </html>
+
