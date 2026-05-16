@@ -1504,6 +1504,7 @@ const updateSim = (t) => {
   const carHalfPxNow = CAR_HALF_PX;
   const carHalfNow = carHalfPxNow / Math.max(0.001, scaleNow);
   const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > Math.max(0, hwNow - carHalfNow);
+  const dangerNow = state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs;
   const slopeNow = (elevation(yCarWorldNow + 10) - elevation(yCarWorldNow)) / 10;
   const slopeFactorNow = clamp(1 - slopeNow * 1.2, 0.72, 1.32);
   const speedNow =
@@ -1513,7 +1514,7 @@ const updateSim = (t) => {
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
   state.speed = speedNow;
-  state.offroad = offroadNow;
+  state.offroad = offroadNow || dangerNow;
   state.penalty = Math.max(0, Math.floor(state.penalty));
   state.score = calcScore(state.finishMs ?? state.elapsedMs, state.penalty);
 
