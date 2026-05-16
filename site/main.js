@@ -1,19 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
-const smoothstep = (a, b, x) => {
-  const t = clamp((x - a) / (b - a), 0, 1);
-  return t * t * (3 - 2 * t);
-};
-
-const centerX = (y) => {
-  const base = 10 * Math.sin(y * 0.0031);
-  const a = 520;
-  const t1 = smoothstep(600, 680, y);
-  const t2 = smoothstep(940, 1020, y);
-  const offsets = a * t1 + a * t2;
-  return base + offsets;
-};
-const halfWidth = (y) => 135 + 18 * Math.sin(y * 0.0007 + 0.5);
+const centerX = () => 0;
+const halfWidth = () => 190;
 
 const state = {
   status: "setup",
@@ -465,8 +453,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   const steps = 56;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
-  const curveScale = 0.28;
-  const camShiftGain = 720;
+  const curveScale = 0.22;
 
   const left = [];
   const right = [];
@@ -474,8 +461,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
     const yWorld = distance + t * lookahead;
-    const camShift = heading * camShiftGain * (t * t);
-    const c = centerX(yWorld) - carX - camShift;
+    const c = centerX(yWorld) - carX;
     const cx = w / 2 + c * curveScale;
     const y = lerp(y1, y0, t);
     left.push([cx - roadHalfPx, y]);
@@ -515,8 +501,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
     const yy = y + dy;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
     const yWorld = distance + t * lookahead;
-    const camShift = heading * camShiftGain * (t * t);
-    const c = centerX(yWorld) - carX - camShift;
+    const c = centerX(yWorld) - carX;
     const cx = w / 2 + c * curveScale;
     drawRoundRect(cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
@@ -527,8 +512,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   if (finishT > 0 && finishT < 1) {
     const y = lerp(y1, y0, finishT);
     const yWorld = finishDistance;
-    const camShift = heading * camShiftGain;
-    const c = centerX(yWorld) - carX - camShift;
+    const c = centerX(yWorld) - carX;
     const cx = w / 2 + c * curveScale;
     drawFinishBand(cx, roadHalfPx, y);
   }
@@ -549,11 +533,15 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   ctx.fill();
   ctx.fillStyle = "rgba(52,211,153,0.92)";
   ctx.beginPath();
-  ctx.moveTo(w / 2, carY - 22);
-  ctx.lineTo(w / 2 + 8, carY - 10);
-  ctx.lineTo(w / 2 - 8, carY - 10);
+  ctx.save();
+  ctx.translate(w / 2, carY - 18);
+  ctx.rotate(heading);
+  ctx.moveTo(0, -10);
+  ctx.lineTo(8, 10);
+  ctx.lineTo(-8, 10);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
   ctx.restore();
 
   const fog = ctx.createLinearGradient(0, y0, 0, y1);
@@ -842,16 +830,16 @@ const updateSim = (t) => {
     sim.elapsedMs += dtMs;
     const neutral = !touch.active && Math.abs(steerTarget) < 0.02;
     const steerInput = clamp(sim.steerSmooth * state.sensitivity, -1, 1);
-    const maxSteerRad = 0.78;
+    const maxSteerRad = 0.95;
     const targetSteerAngle = neutral ? 0 : steerInput * maxSteerRad;
-    const rate = neutral ? state.returnRate : 10.5;
-    sim.steerAngle += clamp(targetSteerAngle - sim.steerAngle, -rate * dt, rate * dt);
+    const steerRate = neutral ? state.returnRate : 12;
+    sim.steerAngle += clamp(targetSteerAngle - sim.steerAngle, -steerRate * dt, steerRate * dt);
 
-    const wheelBase = 185;
-    const yawRate = (speed0 / wheelBase) * Math.tan(sim.steerAngle) * state.steerStrength;
-    sim.heading += yawRate * dt;
-    sim.heading = clamp(sim.heading, -1.25, 1.25);
-    sim.heading *= Math.exp(-0.22 * dt);
+    const maxHeadingRad = 1.05;
+    const targetHeading = neutral ? 0 : steerInput * maxHeadingRad * state.steerStrength;
+    const headingRate = neutral ? state.returnRate : 10;
+    sim.heading += clamp(targetHeading - sim.heading, -headingRate * dt, headingRate * dt);
+    sim.heading = clamp(sim.heading, -maxHeadingRad, maxHeadingRad);
 
     sim.distance += speed0 * Math.cos(sim.heading) * dt;
     sim.x += speed0 * Math.sin(sim.heading) * dt;
