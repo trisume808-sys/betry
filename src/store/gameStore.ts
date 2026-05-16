@@ -56,7 +56,7 @@ export const useGameStore = create<GameState>((set) => ({
   sensorSupported: true,
   sensorPermission: "unknown",
   sensorEnabled: false,
-  sensitivity: 2.2,
+  sensitivity: 3.2,
   calibration: 0,
   telemetry: defaultTelemetry,
   finishMs: null,
@@ -66,7 +66,7 @@ export const useGameStore = create<GameState>((set) => ({
   setSensorPermission: (permission) => set({ sensorPermission: permission }),
   setSensorEnabled: (enabled) => set({ sensorEnabled: enabled }),
   setSensitivity: (value) =>
-    set({ sensitivity: Math.min(4, Math.max(0.6, value)) }),
+    set({ sensitivity: Math.min(8, Math.max(0.6, value)) }),
   setCalibration: (value) => set({ calibration: value }),
 
   setStatus: (status) => set({ status }),
@@ -74,4 +74,3 @@ export const useGameStore = create<GameState>((set) => ({
     set((s) => ({ telemetry: { ...s.telemetry, ...partial } })),
   setFinishMs: (ms) => set({ finishMs: ms }),
 }));
-

@@ -14,6 +14,9 @@ export default function Hud() {
   const sensorPermission = useGameStore((s) => s.sensorPermission);
   const telemetry = useGameStore((s) => s.telemetry);
   const finishMs = useGameStore((s) => s.finishMs);
+  const buildId =
+    (import.meta as unknown as { env?: Record<string, string | undefined> })?.env
+      ?.VITE_BUILD_ID ?? "dev";
 
   const title =
     status === "running"
@@ -38,6 +41,9 @@ export default function Hud() {
         <div className="truncate text-lg font-semibold tracking-tight">
           {title}
         </div>
+        <div className="mt-1 text-[11px] text-zinc-500">
+          build {buildId.slice(0, 7)}
+        </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <div className="rounded-full bg-zinc-900 px-2 py-1 text-xs text-zinc-200">
@@ -52,4 +58,3 @@ export default function Hud() {
     </div>
   );
 }
-

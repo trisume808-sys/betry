@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { canUseDeviceMotion, isPermissionPromptRequired, requestMotionPermission } from "@/input/sensorInput";
+import { useEffect, useState } from "react";
+import { canUseDeviceMotion, canUseDeviceOrientation, isPermissionPromptRequired, requestMotionPermission } from "@/input/sensorInput";
 import { useGameStore } from "@/store/gameStore";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ function Slider(props: {
 }
 
 export default function ControlsPanel() {
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const status = useGameStore((s) => s.status);
   const setStatus = useGameStore((s) => s.setStatus);
   const setFinishMs = useGameStore((s) => s.setFinishMs);
@@ -72,8 +74,15 @@ export default function ControlsPanel() {
 
   const promptRequired = isPermissionPromptRequired();
 
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    onChange();
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
   async function enableSensor() {
-    const supported = canUseDeviceMotion();
+    const supported = canUseDeviceMotion() || canUseDeviceOrientation();
     setSensorSupported(supported);
     if (!supported) {
       setSensorPermission("denied");
@@ -100,8 +109,32 @@ export default function ControlsPanel() {
     }
   }
 
+  async function requestLandscapeFullscreen() {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      return;
+    }
+
+    try {
+      const so = (screen as unknown as { orientation?: { lock?: (v: string) => Promise<void> } })
+        .orientation;
+      await so?.lock?.("landscape");
+    } catch {
+      return;
+    }
+  }
+
+  async function exitFullscreen() {
+    try {
+      await document.exitFullscreen();
+    } catch {
+      return;
+    }
+  }
+
   function calibrate() {
-    setCalibration(telemetry.tilt);
+    setCalibration(telemetry.tilt + calibration);
   }
 
   function reset() {
@@ -174,6 +207,18 @@ export default function ControlsPanel() {
         <Button onClick={reset}>重开</Button>
       </div>
 
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Button
+          onClick={requestLandscapeFullscreen}
+          disabled={isFullscreen}
+        >
+          横屏全屏
+        </Button>
+        <Button onClick={exitFullscreen} disabled={!isFullscreen}>
+          退出全屏
+        </Button>
+      </div>
+
       <div className="mt-3">
         <div className="mb-2 flex items-center justify-between text-xs text-zinc-400">
           <div>灵敏度</div>
@@ -182,7 +227,7 @@ export default function ControlsPanel() {
         <Slider
           value={sensitivity}
           min={0.6}
-          max={4}
+          max={8}
           step={0.05}
           onChange={setSensitivity}
         />
@@ -200,7 +245,9 @@ export default function ControlsPanel() {
             {sensorPermission === "denied"
               ? "传感器不可用/被拒绝，已切换为触控模式"
               : sensorEnabled
-                ? "传感器已启用，建议先校准再开始"
+                ? Math.abs(telemetry.tiltRaw) < 0.0001
+                  ? "传感器已启用但未收到数据：请用Chrome打开，并在站点设置里允许“运动与传感器”"
+                  : "传感器已启用，建议先校准再开始"
                 : "未启用传感器"}
           </div>
         ) : (
