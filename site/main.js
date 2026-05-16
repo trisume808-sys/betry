@@ -1,24 +1,59 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-17";
+const BUILD_ID = "20260516-18";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
 const WALL_HIT_EPS_PX = 1;
 
-const track = {
-  halfWidth: 250,
-  bends: [
-    { start: 120, length: 680, amp: -260 },
-    { start: 1480, length: 780, amp: 320 },
-    { start: 2920, length: 640, amp: -220 },
-    { start: 4180, length: 900, amp: 360 },
-    { start: 5780, length: 700, amp: -320 },
-    { start: 7240, length: 860, amp: 260 },
-    { start: 8920, length: 760, amp: -360 },
-    { start: 10480, length: 980, amp: 300 },
-  ],
+const tracks = {
+  track1: {
+    id: "track1",
+    name: "赛道1",
+    finishDistance: 12400,
+    baseSpeed: 260,
+    halfWidth: 250,
+    bends: [
+      { start: 120, length: 680, amp: -260 },
+      { start: 1480, length: 780, amp: 320 },
+      { start: 2920, length: 640, amp: -220 },
+      { start: 4180, length: 900, amp: 360 },
+      { start: 5780, length: 700, amp: -320 },
+      { start: 7240, length: 860, amp: 260 },
+      { start: 8920, length: 760, amp: -360 },
+      { start: 10480, length: 980, amp: 300 },
+    ],
+    elevation: () => 0,
+  },
+  track2: {
+    id: "track2",
+    name: "赛道2（高难）",
+    finishDistance: 13200,
+    baseSpeed: 270,
+    halfWidth: 210,
+    bends: [
+      { start: 90, length: 520, amp: -360 },
+      { start: 860, length: 460, amp: 420 },
+      { start: 1500, length: 520, amp: -460 },
+      { start: 2280, length: 480, amp: 520 },
+      { start: 3000, length: 520, amp: -420 },
+      { start: 3720, length: 500, amp: 500 },
+      { start: 4520, length: 520, amp: -520 },
+      { start: 5340, length: 520, amp: 460 },
+      { start: 6120, length: 560, amp: -540 },
+      { start: 7000, length: 520, amp: 520 },
+      { start: 7820, length: 560, amp: -500 },
+      { start: 8660, length: 520, amp: 520 },
+      { start: 9520, length: 580, amp: -560 },
+      { start: 10440, length: 600, amp: 540 },
+      { start: 11420, length: 640, amp: -520 },
+    ],
+    elevation: (y) =>
+      95 * Math.sin(y * 0.00115) +
+      70 * Math.sin(y * 0.00235 + 0.9) +
+      32 * Math.sin(y * 0.0037 + 2.1),
+  },
 };
 
 const bendShape = (t) => {
@@ -26,28 +61,10 @@ const bendShape = (t) => {
   return u * u * (3 - 2 * u);
 };
 
-const centerX = (y) => {
-  let x = 0;
-  for (const b of track.bends) {
-    const t = (y - b.start) / b.length;
-    x += b.amp * bendShape(t);
-  }
-  return x;
-};
-
-const halfWidth = () => track.halfWidth;
-
-const roadAngleAt = (y) => {
-  const eps = 14;
-  const d = (centerX(y + eps) - centerX(y - eps)) / (2 * eps);
-  return Math.atan(d);
-};
-
-const finishDistance = 12400;
-
 const state = {
   status: "setup",
   inputMode: "sensor",
+  trackId: "track1",
   sensorPermission: "unknown",
   sensorEnabled: false,
   sensorSupported: true,
@@ -66,6 +83,27 @@ const state = {
   score: 0,
   finishMs: null,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
+};
+
+const getTrack = () => tracks[state.trackId] ?? tracks.track1;
+
+const elevation = (y) => getTrack().elevation(y);
+
+const centerX = (y) => {
+  let x = 0;
+  for (const b of getTrack().bends) {
+    const t = (y - b.start) / b.length;
+    x += b.amp * bendShape(t);
+  }
+  return x;
+};
+
+const halfWidth = () => getTrack().halfWidth;
+
+const roadAngleAt = (y) => {
+  const eps = 14;
+  const d = (centerX(y + eps) - centerX(y - eps)) / (2 * eps);
+  return Math.atan(d);
 };
 
 const ui = {
@@ -345,7 +383,7 @@ const onPointerDown = (e) => {
     }
   }
 
-  for (const key of ["enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
+  for (const key of ["track1", "track2", "enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
     const r = ui.rects.get(key);
     if (r && hit(p.x, p.y, r)) {
       handleButton(key);
@@ -396,6 +434,14 @@ const setSliderByX = (key, x, rect) => {
 };
 
 const handleButton = (key) => {
+  if (key === "track1") {
+    state.trackId = "track1";
+    resetAll();
+  }
+  if (key === "track2") {
+    state.trackId = "track2";
+    resetAll();
+  }
   if (key === "enable") enableSensor();
   if (key === "calibrate") calibrate();
   if (key === "start") startRun();
@@ -573,6 +619,7 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   const steps = 56;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
+  const elevScale = Math.min(0.11, h * 0.00018);
 
   const left = [];
   const right = [];
@@ -584,7 +631,8 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
     const hw = Math.max(1, halfWidth(yWorld));
     const scale = roadHalfPx / hw;
     const cx = w / 2 + c * scale;
-    const y = lerp(y1, y0, t);
+    const elev = elevation(yWorld);
+    const y = clamp(lerp(y1, y0, t) - elev * elevScale * (1 - t * 0.15), y0, y1);
     left.push([cx - roadHalfPx, y]);
     right.push([cx + roadHalfPx, y]);
   }
@@ -627,19 +675,26 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
     const hw = Math.max(1, halfWidth(yWorld));
     const scale = roadHalfPx / hw;
     const cx = w / 2 + c * scale;
-    drawRoundRect(cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
+    const elev = elevation(yWorld);
+    const yAdj = clamp(yy - elev * elevScale * (1 - t * 0.15), y0, y1);
+    drawRoundRect(cx - stripeW / 2, yAdj - stripeH, stripeW, stripeH, 3);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  const finishT = (finishDistance - distance) / lookahead;
+  const finishT = (getTrack().finishDistance - distance) / lookahead;
   if (finishT > 0 && finishT < 1) {
-    const y = lerp(y1, y0, finishT);
-    const yWorld = finishDistance;
+    const yWorld = getTrack().finishDistance;
     const c = centerX(yWorld);
     const hw = Math.max(1, halfWidth(yWorld));
     const scale = roadHalfPx / hw;
     const cx = w / 2 + c * scale;
+    const elev = elevation(yWorld);
+    const y = clamp(
+      lerp(y1, y0, finishT) - elev * elevScale * (1 - finishT * 0.15),
+      y0,
+      y1,
+    );
     drawFinishBand(cx, roadHalfPx, y);
   }
 
@@ -694,6 +749,7 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   const y0 = pad;
   const y1 = y0 + mapH;
   const inset = 12;
+  const fd = getTrack().finishDistance;
 
   const steps = 160;
   const ptsL = [];
@@ -703,7 +759,7 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
 
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
-    const yWorld = t * finishDistance;
+    const yWorld = t * fd;
     const c = centerX(yWorld);
     const hw = halfWidth(yWorld);
     minX = Math.min(minX, c - hw);
@@ -749,7 +805,7 @@ const drawMiniMap = (w, h, carX, distance, offroad, heading) => {
   ctx.lineTo(x0 + mapW - inset, finishY);
   ctx.stroke();
 
-  const carT = clamp(distance / finishDistance, 0, 1);
+  const carT = clamp(distance / fd, 0, 1);
   const carPx = mapX(carX);
   const carPy = mapY(carT);
   ctx.save();
@@ -836,7 +892,11 @@ const drawTopHud = (w, h) => {
   ctx.fillStyle = "rgba(161,161,170,0.9)";
   ctx.font = `${Math.max(10, Math.floor(w * 0.016))}px ui-sans-serif, system-ui`;
   ctx.fillText(`build ${state.build}`, pad + 12, pad + 42);
-  ctx.fillText(`len ${finishDistance} / bends ${track.bends.length}`, pad + 12, pad + 60);
+  ctx.fillText(
+    `${getTrack().name}  len ${getTrack().finishDistance} / bends ${getTrack().bends.length}`,
+    pad + 12,
+    pad + 60,
+  );
   ctx.fillStyle = "rgba(52,211,153,0.9)";
   ctx.fillText(`score ${state.score}  penalty ${state.penalty}`, pad + 12, pad + 80);
   ctx.restore();
@@ -883,17 +943,61 @@ const drawSetupUi = (w, h) => {
   const colW = (panelW - innerPad * 2 - gap) / 2;
   const rowY = subY + 18;
 
+  drawButton(
+    "track1",
+    "赛道1",
+    { x: x0 + innerPad, y: rowY, w: colW, h: btnH },
+    state.trackId === "track1" ? "primary" : "ghost",
+  );
+  drawButton(
+    "track2",
+    "赛道2（高难）",
+    { x: x0 + innerPad + colW + gap, y: rowY, w: colW, h: btnH },
+    state.trackId === "track2" ? "primary" : "ghost",
+  );
+
+  const topRowY = rowY + btnH + gap;
   const enableLabel = isPermissionPromptRequired() ? "启用传感器（点我）" : "启用传感器";
-  drawButton("enable", enableLabel, { x: x0 + innerPad, y: rowY, w: panelW - innerPad * 2, h: btnH }, "primary");
-  drawButton("calibrate", "校准中位", { x: x0 + innerPad, y: rowY + btnH + gap, w: colW, h: btnH }, "ghost");
-  drawButton("touch", "触控模式", { x: x0 + innerPad + colW + gap, y: rowY + btnH + gap, w: colW, h: btnH }, "ghost");
+  drawButton(
+    "enable",
+    enableLabel,
+    { x: x0 + innerPad, y: topRowY, w: panelW - innerPad * 2, h: btnH },
+    "primary",
+  );
+  drawButton(
+    "calibrate",
+    "校准中位",
+    { x: x0 + innerPad, y: topRowY + btnH + gap, w: colW, h: btnH },
+    "ghost",
+  );
+  drawButton(
+    "touch",
+    "触控模式",
+    { x: x0 + innerPad + colW + gap, y: topRowY + btnH + gap, w: colW, h: btnH },
+    "ghost",
+  );
 
-  drawButton("start", "开始", { x: x0 + innerPad, y: rowY + (btnH + gap) * 2, w: panelW - innerPad * 2, h: btnH }, "primary");
+  drawButton(
+    "start",
+    "开始",
+    { x: x0 + innerPad, y: topRowY + (btnH + gap) * 2, w: panelW - innerPad * 2, h: btnH },
+    "primary",
+  );
 
-  drawButton("fs", "横屏全屏", { x: x0 + innerPad, y: rowY + (btnH + gap) * 3, w: colW, h: btnH }, "ghost");
-  drawButton("exitfs", "退出全屏", { x: x0 + innerPad + colW + gap, y: rowY + (btnH + gap) * 3, w: colW, h: btnH }, "ghost");
+  drawButton(
+    "fs",
+    "横屏全屏",
+    { x: x0 + innerPad, y: topRowY + (btnH + gap) * 3, w: colW, h: btnH },
+    "ghost",
+  );
+  drawButton(
+    "exitfs",
+    "退出全屏",
+    { x: x0 + innerPad + colW + gap, y: topRowY + (btnH + gap) * 3, w: colW, h: btnH },
+    "ghost",
+  );
 
-  const sliderY = rowY + (btnH + gap) * 4 + 8;
+  const sliderY = topRowY + (btnH + gap) * 4 + 8;
   const sliderH = portrait ? Math.max(44, Math.floor(h * 0.056)) : Math.max(38, Math.floor(h * 0.05));
   drawSlider("sensitivity", { x: x0 + innerPad, y: sliderY, w: panelW - innerPad * 2, h: sliderH }, state.sensitivity, 0.6, 8, "灵敏度");
   drawSlider(
@@ -989,7 +1093,8 @@ const updateSim = (t) => {
       sim.nextGyroFlipMs = sim.elapsedMs + randRange(2500, 6500);
     }
 
-    const baseSpeed = 260;
+    const baseSpeed = getTrack().baseSpeed;
+    const fd = getTrack().finishDistance;
     const y0 = h * 0.16;
     const y1 = h * 0.9;
     const carMarkerY = h * 0.74;
@@ -1007,7 +1112,9 @@ const updateSim = (t) => {
     const leftWall = cx - roadHalfPx + carHalfPx;
     const rightWall = cx + roadHalfPx - carHalfPx;
     const wallNow = markerX <= leftWall || markerX >= rightWall;
-    const speed = baseSpeed * (wallNow ? 0.55 : 1);
+    const slope = (elevation(yCarWorld + 10) - elevation(yCarWorld)) / 10;
+    const slopeFactor = clamp(1 - slope * 1.2, 0.72, 1.32);
+    const speed = baseSpeed * (wallNow ? 0.55 : 1) * slopeFactor;
 
     sim.distance += speed * dt;
 
@@ -1037,8 +1144,8 @@ const updateSim = (t) => {
     }
     sim.x = (clampedMarkerX - w / 2) / Math.max(0.001, nscale);
 
-    if (sim.distance >= finishDistance) {
-      sim.distance = finishDistance;
+    if (sim.distance >= fd) {
+      sim.distance = fd;
       if (state.finishMs == null) state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
       state.score = calcScore(state.finishMs, state.penalty);
       state.status = "setup";
@@ -1062,7 +1169,10 @@ const updateSim = (t) => {
     state.status === "running" &&
     (markerNow <= cxNow - roadHalfPxNow + carHalfPxNow ||
       markerNow >= cxNow + roadHalfPxNow - carHalfPxNow);
-  const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
+  const slopeNow = (elevation(yCarWorldNow + 10) - elevation(yCarWorldNow)) / 10;
+  const slopeFactorNow = clamp(1 - slopeNow * 1.2, 0.72, 1.32);
+  const speedNow =
+    state.status === "running" ? getTrack().baseSpeed * (offroadNow ? 0.55 : 1) * slopeFactorNow : 0;
   sim.roadAngle = roadAngleAt(yCarWorldNow);
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
