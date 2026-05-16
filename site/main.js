@@ -517,22 +517,25 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   }
 
   const carMarkerY = h * 0.74;
+  const maxOffset = roadHalfPx - 20;
+  const carX = w / 2 + heading * maxOffset * 2;
+  
   ctx.save();
   ctx.globalAlpha = 0.85;
   ctx.strokeStyle = "rgba(244,244,245,0.18)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(w / 2, carMarkerY - 40);
-  ctx.lineTo(w / 2, carMarkerY + 12);
+  ctx.moveTo(carX, carMarkerY - 40);
+  ctx.lineTo(carX, carMarkerY + 12);
   ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.fillStyle = "rgba(244,244,245,0.22)";
-  drawRoundRect(w / 2 - 10, carMarkerY - 16, 20, 32, 6);
+  drawRoundRect(carX - 10, carMarkerY - 16, 20, 32, 6);
   ctx.fill();
   ctx.fillStyle = "rgba(52,211,153,0.92)";
   ctx.beginPath();
   ctx.save();
-  ctx.translate(w / 2, carMarkerY - 18);
+  ctx.translate(carX, carMarkerY - 18);
   ctx.rotate(heading);
   ctx.moveTo(0, -10);
   ctx.lineTo(8, 10);
