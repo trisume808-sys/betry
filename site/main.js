@@ -1,5 +1,6 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+const randRange = (min, max) => min + (max - min) * Math.random();
 
 const track = {
   halfWidth: 230,
@@ -69,6 +70,8 @@ const sim = {
   elapsedMs: 0,
   steerSmooth: 0,
   steerAngle: 0,
+  gyroFlip: 1,
+  nextGyroFlipMs: 0,
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -203,10 +206,13 @@ const resetRun = () => {
   state.tiltSmooth = 0;
   sim.x = 0;
   sim.heading = 0;
+  sim.roadAngle = 0;
   sim.distance = 0;
   sim.elapsedMs = 0;
   sim.steerSmooth = 0;
   sim.steerAngle = 0;
+  sim.gyroFlip = 1;
+  sim.nextGyroFlipMs = randRange(2500, 6500);
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
@@ -852,11 +858,14 @@ const updateSim = (t) => {
   const h = canvas.height;
 
   const mapped = state.inputMode === "sensor" && state.sensorEnabled && sensor.hasData ? sensor.mapped : 0;
-  const tilt = clamp(mapped - state.calibration, -1, 1);
-  state.tilt = tilt;
+  const tiltBase = clamp(mapped - state.calibration, -1, 1);
+  state.tilt = tiltBase;
   state.tiltRaw = sensor.raw;
 
-  const steerTarget = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : tilt;
+  const sensorSteer =
+    state.inputMode === "sensor" && state.sensorEnabled ? tiltBase * sim.gyroFlip : tiltBase;
+
+  const steerTarget = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : sensorSteer;
 
   const follow = 1 - Math.pow(0.001, dt);
   sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.18);
@@ -869,6 +878,12 @@ const updateSim = (t) => {
 
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
+    if (state.inputMode === "sensor" && state.sensorEnabled) {
+      if (sim.elapsedMs >= sim.nextGyroFlipMs) {
+        sim.gyroFlip *= -1;
+        sim.nextGyroFlipMs = sim.elapsedMs + randRange(2500, 6500);
+      }
+    }
 
     const baseSpeed = 260;
     const y = sim.distance;
