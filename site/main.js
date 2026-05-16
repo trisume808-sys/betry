@@ -1,12 +1,9 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-5";
-const SCORE_BASE = 10000;
-const SCORE_TIME_RATE = 0.02;
-
-const calcScore = (ms, penalty) =>
-  Math.max(0, Math.floor(SCORE_BASE - penalty - ms * SCORE_TIME_RATE));
+const BUILD_ID = "20260516-6";
+const SCORE_BASE = 100;
+const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 
 const track = {
   halfWidth: 250,
@@ -917,8 +914,12 @@ const updateSim = (t) => {
     const scale = roadHalfPx / Math.max(1, hw);
     const carHalfPx = 14;
     const carHalf = carHalfPx / Math.max(0.001, scale);
-    const offroad = Math.abs(sim.x - c) > hw - carHalf;
-    const speed = baseSpeed * (offroad ? 0.55 : 1);
+    const cx = w / 2 + c * scale;
+    const markerX = w / 2 + sim.x * scale;
+    const leftWall = cx - roadHalfPx + carHalfPx;
+    const rightWall = cx + roadHalfPx - carHalfPx;
+    const wallNow = markerX <= leftWall || markerX >= rightWall;
+    const speed = baseSpeed * (wallNow ? 0.55 : 1);
 
     sim.distance += speed * dt;
 
@@ -933,19 +934,20 @@ const updateSim = (t) => {
     const nc = centerX(ny);
     const nhw = halfWidth(ny);
     const nscale = roadHalfPx / Math.max(1, nhw);
-    const ncarHalf = carHalfPx / Math.max(0.001, nscale);
-    const limit = nhw - ncarHalf;
-    const nx = sim.x - nc;
-    const wall = Math.abs(nx) >= limit - 1e-4;
-    const pushingOut = nx * steer > 0.000001;
-    if (wall && pushingOut && sim.elapsedMs - sim.lastPenaltyMs > 150) {
+    const ncx = w / 2 + nc * nscale;
+    const rawMarkerX = w / 2 + sim.x * nscale;
+    const left = ncx - roadHalfPx + carHalfPx;
+    const right = ncx + roadHalfPx - carHalfPx;
+    const clampedMarkerX = clamp(rawMarkerX, left, right);
+    const hitWall = Math.abs(rawMarkerX - clampedMarkerX) > 1e-6;
+    if (hitWall && sim.elapsedMs - sim.lastPenaltyMs > 150) {
       sim.lastPenaltyMs = sim.elapsedMs;
-      const delta = 10;
+      const delta = 1;
       state.penalty += delta;
       sim.lastPenaltyDelta = delta;
       sim.penaltyFlashUntil = sim.elapsedMs + 520;
     }
-    sim.x = nc + clamp(nx, -limit, limit);
+    sim.x = (clampedMarkerX - w / 2) / Math.max(0.001, nscale);
 
     if (sim.distance >= finishDistance) {
       sim.distance = finishDistance;
@@ -960,9 +962,13 @@ const updateSim = (t) => {
   const hwNow = halfWidth(yNow);
   const roadHalfPxNow = Math.min(w * 0.28, 240);
   const scaleNow = roadHalfPxNow / Math.max(1, hwNow);
+  const cxNow = w / 2 + cNow * scaleNow;
   const carHalfPxNow = 14;
-  const carHalfNow = carHalfPxNow / Math.max(0.001, scaleNow);
-  const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) >= hwNow - carHalfNow - 1e-6;
+  const markerNow = w / 2 + sim.x * scaleNow;
+  const offroadNow =
+    state.status === "running" &&
+    (markerNow <= cxNow - roadHalfPxNow + carHalfPxNow ||
+      markerNow >= cxNow + roadHalfPxNow - carHalfPxNow);
   const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
   sim.roadAngle = roadAngleAt(yNow);
 
