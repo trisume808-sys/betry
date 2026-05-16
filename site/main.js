@@ -429,12 +429,34 @@ const drawRoundRect = (x, y, w, h, r) => {
 const drawButton = (key, label, rect, variant) => {
   ui.rects.set(key, rect);
   ctx.save();
+  const r = Math.min(18, rect.h / 2);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = variant === "primary" ? "rgba(52,211,153,0.92)" : "rgba(24,24,27,0.72)";
-  drawRoundRect(rect.x, rect.y, rect.w, rect.h, 14);
+  if (variant === "primary") {
+    const g = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    g.addColorStop(0, "rgba(52,211,153,0.98)");
+    g.addColorStop(1, "rgba(16,185,129,0.92)");
+    ctx.fillStyle = g;
+  } else {
+    const g = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+    g.addColorStop(0, "rgba(24,24,27,0.78)");
+    g.addColorStop(1, "rgba(9,9,11,0.64)");
+    ctx.fillStyle = g;
+  }
+  drawRoundRect(rect.x, rect.y, rect.w, rect.h, r);
   ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle =
+    variant === "primary" ? "rgba(167,243,208,0.55)" : "rgba(244,244,245,0.14)";
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.28;
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  drawRoundRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h * 0.44, r - 1);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
   ctx.fillStyle = variant === "primary" ? "rgba(9,9,11,0.95)" : "rgba(244,244,245,0.92)";
-  ctx.font = `${Math.floor(rect.h * 0.45)}px ui-sans-serif, system-ui`;
+  ctx.font = `${Math.floor(rect.h * 0.42)}px ui-sans-serif, system-ui`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
@@ -445,19 +467,38 @@ const drawSlider = (key, rect, value, min, max, label) => {
   ui.rects.set(key, rect);
   const t = clamp((value - min) / (max - min), 0, 1);
   ctx.save();
+  const r = Math.min(14, rect.h / 2);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "rgba(24,24,27,0.65)";
-  drawRoundRect(rect.x, rect.y, rect.w, rect.h, 12);
+  ctx.fillStyle = "rgba(9,9,11,0.55)";
+  drawRoundRect(rect.x, rect.y, rect.w, rect.h, r);
   ctx.fill();
-  ctx.fillStyle = "rgba(52,211,153,0.75)";
-  const fillW = rect.w * t;
-  drawRoundRect(rect.x, rect.y, fillW, rect.h, 12);
+  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = "rgba(244,244,245,0.12)";
+  ctx.stroke();
+
+  const barH = Math.max(10, Math.floor(rect.h * 0.34));
+  const barY = rect.y + rect.h - barH - 6;
+  ctx.fillStyle = "rgba(24,24,27,0.85)";
+  drawRoundRect(rect.x + 10, barY, rect.w - 20, barH, Math.min(10, barH / 2));
   ctx.fill();
-  ctx.fillStyle = "rgba(244,244,245,0.9)";
-  ctx.font = `${Math.floor(rect.h * 0.62)}px ui-sans-serif, system-ui`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`${label} ${value.toFixed(2)}`, rect.x + rect.w / 2, rect.y + rect.h / 2);
+
+  const fillW = (rect.w - 20) * t;
+  const g = ctx.createLinearGradient(rect.x + 10, barY, rect.x + 10 + fillW, barY);
+  g.addColorStop(0, "rgba(52,211,153,0.95)");
+  g.addColorStop(1, "rgba(16,185,129,0.85)");
+  ctx.fillStyle = g;
+  drawRoundRect(rect.x + 10, barY, fillW, barH, Math.min(10, barH / 2));
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(244,244,245,0.92)";
+  ctx.font = `${Math.floor(rect.h * 0.34)}px ui-sans-serif, system-ui`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(label, rect.x + 12, rect.y + Math.floor(rect.h * 0.44));
+
+  ctx.fillStyle = "rgba(161,161,170,0.95)";
+  ctx.textAlign = "right";
+  ctx.fillText(value.toFixed(2), rect.x + rect.w - 12, rect.y + Math.floor(rect.h * 0.44));
   ctx.restore();
 };
 
@@ -779,44 +820,55 @@ const drawTopHud = (w, h) => {
 
 const drawSetupUi = (w, h) => {
   ui.rects.clear();
-  const pad = 14;
-  const panelW = Math.min(w * 0.9, 520);
+  const portrait = h >= w * 1.05;
+  const pad = Math.max(14, Math.floor(w * 0.03));
+  const panelW = Math.min(w - pad * 2, 540);
   const x0 = (w - panelW) / 2;
-  const y0 = h * 0.62;
-  const panelH = h - y0 - pad - (state.status === "setup" ? 0 : 0);
+  const y0 = portrait ? Math.floor(h * 0.18) : Math.floor(h * 0.62);
+  const panelH = portrait ? Math.min(Math.floor(h * 0.72), 560) : h - y0 - pad;
 
   ctx.save();
-  ctx.fillStyle = "rgba(10,10,18,0.62)";
-  drawRoundRect(x0, y0, panelW, panelH, 20);
+  const bg = ctx.createLinearGradient(0, y0, 0, y0 + panelH);
+  bg.addColorStop(0, "rgba(10,10,18,0.78)");
+  bg.addColorStop(1, "rgba(9,9,11,0.55)");
+  ctx.fillStyle = bg;
+  drawRoundRect(x0, y0, panelW, panelH, 22);
   ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(244,244,245,0.12)";
+  ctx.stroke();
 
   ctx.fillStyle = "rgba(244,244,245,0.95)";
-  ctx.font = `${Math.max(12, Math.floor(w * 0.022))}px ui-sans-serif, system-ui`;
+  ctx.font = `${Math.max(14, Math.floor(w * 0.03))}px ui-sans-serif, system-ui`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("校准 → 开始", x0 + 14, y0 + 26);
+  ctx.fillText("陀螺仪赛车", x0 + 18, y0 + 34);
+  ctx.fillStyle = "rgba(161,161,170,0.95)";
+  ctx.font = `${Math.max(11, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
+  ctx.fillText("启用传感器 → 校准中位 → 开始", x0 + 18, y0 + 58);
 
-  const btnH = Math.max(44, Math.floor(h * 0.06));
-  const gap = 10;
-  const colW = (panelW - 14 * 2 - gap) / 2;
-  const rowY = y0 + 38;
+  const btnH = portrait ? Math.max(52, Math.floor(h * 0.062)) : Math.max(44, Math.floor(h * 0.06));
+  const gap = portrait ? 12 : 10;
+  const innerPad = 18;
+  const colW = (panelW - innerPad * 2 - gap) / 2;
+  const rowY = y0 + 74;
 
   const enableLabel = isPermissionPromptRequired() ? "启用传感器（点我）" : "启用传感器";
-  drawButton("enable", enableLabel, { x: x0 + 14, y: rowY, w: colW, h: btnH }, "primary");
-  drawButton("calibrate", "校准中位", { x: x0 + 14 + colW + gap, y: rowY, w: colW, h: btnH }, "ghost");
+  drawButton("enable", enableLabel, { x: x0 + innerPad, y: rowY, w: panelW - innerPad * 2, h: btnH }, "primary");
+  drawButton("calibrate", "校准中位", { x: x0 + innerPad, y: rowY + btnH + gap, w: colW, h: btnH }, "ghost");
+  drawButton("touch", "触控模式", { x: x0 + innerPad + colW + gap, y: rowY + btnH + gap, w: colW, h: btnH }, "ghost");
 
-  drawButton("start", "开始", { x: x0 + 14, y: rowY + btnH + gap, w: colW, h: btnH }, "primary");
-  drawButton("touch", "触控模式", { x: x0 + 14 + colW + gap, y: rowY + btnH + gap, w: colW, h: btnH }, "ghost");
+  drawButton("start", "开始", { x: x0 + innerPad, y: rowY + (btnH + gap) * 2, w: panelW - innerPad * 2, h: btnH }, "primary");
 
-  drawButton("fs", "横屏全屏", { x: x0 + 14, y: rowY + (btnH + gap) * 2, w: colW, h: btnH }, "ghost");
-  drawButton("exitfs", "退出全屏", { x: x0 + 14 + colW + gap, y: rowY + (btnH + gap) * 2, w: colW, h: btnH }, "ghost");
+  drawButton("fs", "横屏全屏", { x: x0 + innerPad, y: rowY + (btnH + gap) * 3, w: colW, h: btnH }, "ghost");
+  drawButton("exitfs", "退出全屏", { x: x0 + innerPad + colW + gap, y: rowY + (btnH + gap) * 3, w: colW, h: btnH }, "ghost");
 
-  const sliderY = rowY + (btnH + gap) * 3 + 4;
-  const sliderH = Math.max(34, Math.floor(h * 0.045));
-  drawSlider("sensitivity", { x: x0 + 14, y: sliderY, w: panelW - 28, h: sliderH }, state.sensitivity, 0.6, 8, "灵敏度");
+  const sliderY = rowY + (btnH + gap) * 4 + 8;
+  const sliderH = portrait ? Math.max(44, Math.floor(h * 0.056)) : Math.max(38, Math.floor(h * 0.05));
+  drawSlider("sensitivity", { x: x0 + innerPad, y: sliderY, w: panelW - innerPad * 2, h: sliderH }, state.sensitivity, 0.6, 8, "灵敏度");
   drawSlider(
     "steerStrength",
-    { x: x0 + 14, y: sliderY + sliderH + 10, w: panelW - 28, h: sliderH },
+    { x: x0 + innerPad, y: sliderY + sliderH + 12, w: panelW - innerPad * 2, h: sliderH },
     state.steerStrength,
     0.4,
     2.5,
@@ -824,7 +876,7 @@ const drawSetupUi = (w, h) => {
   );
   drawSlider(
     "returnRate",
-    { x: x0 + 14, y: sliderY + (sliderH + 10) * 2, w: panelW - 28, h: sliderH },
+    { x: x0 + innerPad, y: sliderY + (sliderH + 12) * 2, w: panelW - innerPad * 2, h: sliderH },
     state.returnRate,
     2,
     14,
@@ -832,8 +884,8 @@ const drawSetupUi = (w, h) => {
   );
 
   ctx.fillStyle = "rgba(161,161,170,0.95)";
-  ctx.font = `${Math.max(10, Math.floor(w * 0.016))}px ui-sans-serif, system-ui`;
-  const t1 = `倾斜 ${state.tilt.toFixed(2)} / 平滑 ${state.tiltSmooth.toFixed(2)} / 计时 ${formatMs(state.elapsedMs)}`;
+  ctx.font = `${Math.max(10, Math.floor(w * 0.018))}px ui-sans-serif, system-ui`;
+  const t1 = `倾斜 ${state.tilt.toFixed(2)} / 平滑 ${state.tiltSmooth.toFixed(2)}`;
   const t2 =
     state.inputMode === "touch"
       ? "触控：按住画面左右拖动"
@@ -844,9 +896,9 @@ const drawSetupUi = (w, h) => {
             ? "传感器已启用：先校准，再开始"
             : "传感器已启用但未收到数据：建议用 Chrome/Edge，并允许“运动与传感器”"
           : "未启用传感器";
-  const infoY = sliderY + (sliderH + 10) * 3 + 12;
-  ctx.fillText(t1, x0 + 14, infoY + 16);
-  ctx.fillText(t2, x0 + 14, infoY + 36);
+  const infoY = sliderY + (sliderH + 12) * 3 + 14;
+  ctx.fillText(t1, x0 + innerPad, infoY + 18);
+  ctx.fillText(t2, x0 + innerPad, infoY + 40);
   ctx.restore();
 };
 
