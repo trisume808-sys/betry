@@ -1,7 +1,12 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-3";
+const BUILD_ID = "20260516-5";
+const SCORE_BASE = 10000;
+const SCORE_TIME_RATE = 0.02;
+
+const calcScore = (ms, penalty) =>
+  Math.max(0, Math.floor(SCORE_BASE - penalty - ms * SCORE_TIME_RATE));
 
 const track = {
   halfWidth: 250,
@@ -59,6 +64,7 @@ const state = {
   speed: 0,
   offroad: false,
   penalty: 0,
+  score: 0,
   finishMs: null,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
@@ -81,6 +87,8 @@ const sim = {
   gyroFlip: 1,
   nextGyroFlipMs: 0,
   lastPenaltyMs: 0,
+  penaltyFlashUntil: 0,
+  lastPenaltyDelta: 0,
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -213,6 +221,7 @@ const resetRun = () => {
   state.speed = 0;
   state.offroad = false;
   state.penalty = 0;
+  state.score = SCORE_BASE;
   state.tiltSmooth = 0;
   sim.x = 0;
   sim.heading = 0;
@@ -852,9 +861,9 @@ const drawRunUi = (w, h) => {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(`计时 ${formatMs(state.finishMs ?? state.elapsedMs)}`, pad + 12, pad + 92);
-  ctx.fillStyle = "rgba(161,161,170,0.9)";
-  ctx.font = `${Math.max(11, Math.floor(w * 0.017))}px ui-sans-serif, system-ui`;
-  ctx.fillText(`扣分 ${state.penalty}`, pad + 12, pad + 114);
+  ctx.fillStyle = "rgba(52,211,153,0.95)";
+  ctx.font = `${Math.max(14, Math.floor(w * 0.02))}px ui-sans-serif, system-ui`;
+  ctx.fillText(`得分 ${state.score}`, pad + 12, pad + 118);
   ctx.restore();
 
   const btnW = Math.min(w * 0.6, 360);
@@ -929,15 +938,19 @@ const updateSim = (t) => {
     const nx = sim.x - nc;
     const wall = Math.abs(nx) >= limit - 1e-4;
     const pushingOut = nx * steer > 0.000001;
-    if (wall && pushingOut && sim.elapsedMs - sim.lastPenaltyMs > 200) {
+    if (wall && pushingOut && sim.elapsedMs - sim.lastPenaltyMs > 150) {
       sim.lastPenaltyMs = sim.elapsedMs;
-      state.penalty += 1;
+      const delta = 10;
+      state.penalty += delta;
+      sim.lastPenaltyDelta = delta;
+      sim.penaltyFlashUntil = sim.elapsedMs + 520;
     }
     sim.x = nc + clamp(nx, -limit, limit);
 
     if (sim.distance >= finishDistance) {
       sim.distance = finishDistance;
       if (state.finishMs == null) state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
+      state.score = calcScore(state.finishMs, state.penalty);
       state.status = "setup";
     }
   }
@@ -958,6 +971,7 @@ const updateSim = (t) => {
   state.speed = speedNow;
   state.offroad = offroadNow;
   state.penalty = Math.max(0, Math.floor(state.penalty));
+  state.score = calcScore(state.finishMs ?? state.elapsedMs, state.penalty);
 
   drawFrame(w, h);
 };
@@ -970,6 +984,41 @@ const drawFrame = (w, h) => {
   drawMiniMap(w, h, sim.x, sim.distance, state.offroad, heading);
   drawCockpit(w, h, state.offroad);
   drawTopHud(w, h);
+  if (state.status !== "running" && state.finishMs != null) {
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = "rgba(10,10,18,0.72)";
+    const bw = Math.min(w * 0.78, 520);
+    const bh = Math.min(h * 0.26, 220);
+    const bx = (w - bw) / 2;
+    const by = h * 0.22;
+    drawRoundRect(bx, by, bw, bh, 22);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(52,211,153,0.98)";
+    ctx.font = `${Math.max(34, Math.floor(w * 0.08))}px ui-sans-serif, system-ui`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`得分 ${state.score}`, w * 0.5, by + bh * 0.42);
+    ctx.fillStyle = "rgba(244,244,245,0.9)";
+    ctx.font = `${Math.max(14, Math.floor(w * 0.022))}px ui-sans-serif, system-ui`;
+    ctx.fillText(`用时 ${formatMs(state.finishMs)}   扣分 ${state.penalty}`, w * 0.5, by + bh * 0.78);
+    ctx.restore();
+  }
+  if (state.status === "running" && sim.penaltyFlashUntil > sim.elapsedMs) {
+    const k = clamp((sim.penaltyFlashUntil - sim.elapsedMs) / 520, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = 0.25 + 0.55 * k;
+    ctx.fillStyle = "rgba(248,113,113,0.55)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = "rgba(248,113,113,0.98)";
+    ctx.font = `${Math.max(26, Math.floor(w * 0.06))}px ui-sans-serif, system-ui`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`-${sim.lastPenaltyDelta}`, w * 0.5, h * 0.42);
+    ctx.restore();
+  }
   if (state.status === "running") drawRunUi(w, h);
   else drawSetupUi(w, h);
 };
