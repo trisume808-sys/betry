@@ -165,6 +165,22 @@ export default function ControlsPanel() {
     inputMode === "sensor" &&
     (!sensorEnabled || sensorPermission !== "granted" || !sensorSupported);
 
+  if (status === "running") {
+    return (
+      <div className="fixed inset-x-0 bottom-3 z-20 flex justify-center px-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="w-full max-w-[520px]">
+          <div className="rounded-xl bg-zinc-950/65 p-2 backdrop-blur">
+            <div className="grid grid-cols-1 gap-2">
+              <Button onClick={reset} variant="primary">
+                重开
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl bg-zinc-900/60 p-2.5 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -194,16 +210,12 @@ export default function ControlsPanel() {
             使用触控模式
           </Button>
         )}
-        <Button onClick={calibrate} disabled={status === "running"}>
+        <Button onClick={calibrate}>
           校准中位
         </Button>
-        {status === "running" ? (
-          <Button onClick={reset}>结束/重置</Button>
-        ) : (
-          <Button onClick={start} variant="primary">
-            开始
-          </Button>
-        )}
+        <Button onClick={start} variant="primary">
+          开始
+        </Button>
         <Button onClick={reset}>重开</Button>
       </div>
 
