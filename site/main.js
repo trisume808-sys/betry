@@ -7,7 +7,7 @@ const buildTrack = () => {
   const L1 = 720;
   const L2 = 520;
   const L3 = 880;
-  const R = 220;
+  const R = 520;
   const arcLen = (Math.PI * 0.5) * R;
 
   let x = 0;
@@ -59,7 +59,7 @@ const buildTrack = () => {
 
 const track = buildTrack();
 const finishDistance = track.total;
-const roadHalfAt = () => 260;
+const roadHalfAt = () => 230;
 
 const trackAt = (s) => {
   const ss = clamp(s, 0, finishDistance);
@@ -530,10 +530,11 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   const roadHalfPx = Math.min(w * 0.28, 240);
   const curveScale = roadHalfPx / roadHalfAt(s0);
 
-  const fwdX = Math.sin(carHeading);
-  const fwdY = Math.cos(carHeading);
-  const rightX = Math.cos(carHeading);
-  const rightY = -Math.sin(carHeading);
+  const camHeading = trackAt(s0).heading;
+  const fwdX = Math.sin(camHeading);
+  const fwdY = Math.cos(camHeading);
+  const rightX = Math.cos(camHeading);
+  const rightY = -Math.sin(camHeading);
 
   const left = [];
   const right = [];
@@ -542,33 +543,17 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
     const t = i / steps;
     const s = s0 + t * lookahead;
     const center = trackAt(s);
-    const roadHalf = roadHalfAt(s);
-    const tnX = Math.sin(center.heading);
-    const tnY = Math.cos(center.heading);
-    const rnX = Math.cos(center.heading);
-    const rnY = -Math.sin(center.heading);
-
-    const lxW = center.x - rnX * roadHalf;
-    const lyW = center.y - rnY * roadHalf;
-    const rxW = center.x + rnX * roadHalf;
-    const ryW = center.y + rnY * roadHalf;
-
-    const ldx = lxW - carX;
-    const ldy = lyW - carY;
-    const rdx = rxW - carX;
-    const rdy = ryW - carY;
-
-    const lF = dot(ldx, ldy, fwdX, fwdY);
-    const rF = dot(rdx, rdy, fwdX, fwdY);
-    const f = Math.max(0, Math.min(lF, rF));
+    const dx = center.x - carX;
+    const dyW = center.y - carY;
+    const f = dot(dx, dyW, fwdX, fwdY);
+    const r = dot(dx, dyW, rightX, rightY);
     const tt = clamp(f / lookahead, 0, 1);
-
-    const lR = dot(ldx, ldy, rightX, rightY);
-    const rR = dot(rdx, rdy, rightX, rightY);
-
+    const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
+    const roadHalf = roadHalfAt(s) * curveScale * scale;
+    const cx = w / 2 + r * curveScale * scale;
     const y = lerp(y1, y0, tt);
-    left.push([w / 2 + lR * curveScale, y, tt, tnX, tnY]);
-    right.push([w / 2 + rR * curveScale, y, tt]);
+    left.push([cx - roadHalf, y, tt]);
+    right.push([cx + roadHalf, y, tt]);
   }
 
   ctx.save();
@@ -602,15 +587,14 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   for (let y = y1; y > y0; y -= stripeH + stripeGap) {
     const dy = (s0 * 0.22) % (stripeH + stripeGap);
     const yy = y + dy;
-    const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
-    const s = s0 + t * lookahead;
+    const tt = clamp((y1 - yy) / (y1 - y0), 0, 1);
+    const s = s0 + tt * lookahead;
     const center = trackAt(s);
     const dx = center.x - carX;
     const dyW = center.y - carY;
-    const f = dot(dx, dyW, fwdX, fwdY);
     const rr = dot(dx, dyW, rightX, rightY);
-    const tt = clamp(f / lookahead, 0, 1);
-    const cx = w / 2 + rr * curveScale;
+    const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
+    const cx = w / 2 + rr * curveScale * scale;
     const yyy = lerp(y1, y0, tt);
     drawRoundRect(cx - stripeW / 2, yyy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
@@ -623,10 +607,12 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   const finishF = dot(fdx, fdy, fwdX, fwdY);
   if (finishF > 0 && finishF < lookahead) {
     const tt = finishF / lookahead;
+    const scale = (1 - tt) * (1 - tt) * 0.86 + 0.14;
     const y = lerp(y1, y0, tt);
     const rr = dot(fdx, fdy, rightX, rightY);
-    const cx = w / 2 + rr * curveScale;
-    drawFinishBand(cx, roadHalfPx, y);
+    const cx = w / 2 + rr * curveScale * scale;
+    const rh = roadHalfAt(finishDistance) * curveScale * scale;
+    drawFinishBand(cx, rh, y);
   }
 
   const carMarkerY = h * 0.74;
@@ -646,7 +632,7 @@ const drawRoadFlat = (w, h, carX, carY, s0, carHeading) => {
   ctx.beginPath();
   ctx.save();
   ctx.translate(w / 2, carMarkerY - 18);
-  ctx.rotate(carHeading);
+  ctx.rotate(carHeading - camHeading);
   ctx.moveTo(0, -10);
   ctx.lineTo(8, 10);
   ctx.lineTo(-8, 10);
