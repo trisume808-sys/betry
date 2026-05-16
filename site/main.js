@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-2";
+const BUILD_ID = "20260516-3";
 
 const track = {
   halfWidth: 250,
@@ -927,8 +927,9 @@ const updateSim = (t) => {
     const ncarHalf = carHalfPx / Math.max(0.001, nscale);
     const limit = nhw - ncarHalf;
     const nx = sim.x - nc;
-    const hit = Math.abs(nx) > limit + 1e-6;
-    if (hit && sim.elapsedMs - sim.lastPenaltyMs > 220) {
+    const wall = Math.abs(nx) >= limit - 1e-4;
+    const pushingOut = nx * steer > 0.000001;
+    if (wall && pushingOut && sim.elapsedMs - sim.lastPenaltyMs > 200) {
       sim.lastPenaltyMs = sim.elapsedMs;
       state.penalty += 1;
     }
