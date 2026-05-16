@@ -914,7 +914,14 @@ const drawFinishBand = (cx, roadHalf, y) => {
 const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y0 = h * VIEW_Y0_T;
   const y1 = h * VIEW_Y1_T;
-  const steps = 34;
+  const steps =
+    state.status === "running"
+      ? lowEnd
+        ? 20
+        : 24
+      : lowEnd
+        ? 24
+        : 30;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
   const elevScale = Math.min(0.11, h * 0.00018);
