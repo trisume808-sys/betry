@@ -43,13 +43,184 @@
         font-size: 12px;
         user-select: none;
       }
+
+      .link.topdown {
+        right: 12px;
+      }
+
+      .link.tutorial {
+        right: 84px;
+        border: 0;
+        cursor: pointer;
+      }
+
+      #tutorialOverlay[hidden] {
+        display: none;
+      }
+
+      #tutorialOverlay {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      #tutorialBackdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+      }
+
+      #tutorialPanel {
+        position: relative;
+        width: min(560px, 100%);
+        max-height: 78vh;
+        overflow: auto;
+        border-radius: 18px;
+        border: 1px solid rgba(63, 63, 70, 0.9);
+        background: rgba(10, 10, 18, 0.92);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+        padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+      }
+
+      #tutorialHeader {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(39, 39, 42, 0.9);
+      }
+
+      #tutorialTitle {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      #tutorialSub {
+        margin-top: 4px;
+        font-size: 11px;
+        color: rgba(161, 161, 170, 0.95);
+        line-height: 1.35;
+      }
+
+      #tutorialClose {
+        border: 0;
+        border-radius: 12px;
+        background: rgba(24, 24, 27, 0.9);
+        color: rgba(244, 244, 245, 0.95);
+        font-size: 12px;
+        padding: 8px 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      #tutorialClose:hover {
+        background: rgba(39, 39, 42, 0.9);
+      }
+
+      .tutorialSection {
+        margin-top: 12px;
+      }
+
+      .tutorialH {
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(244, 244, 245, 0.95);
+      }
+
+      .tutorialP {
+        margin-top: 6px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: rgba(212, 212, 216, 0.95);
+      }
+
+      .tutorialUl {
+        margin: 6px 0 0 0;
+        padding-left: 18px;
+        color: rgba(212, 212, 216, 0.95);
+        font-size: 12px;
+        line-height: 1.6;
+      }
     </style>
   </head>
   <body>
-    <a class="link" href="./topdown.html">俯视超跑</a>
+    <button class="link tutorial" id="tutorialOpen" type="button">教程</button>
+    <a class="link topdown" href="./topdown.html">俯视超跑</a>
+    <div id="tutorialOverlay" hidden>
+      <button id="tutorialBackdrop" type="button" aria-label="关闭教程"></button>
+      <div id="tutorialPanel" role="dialog" aria-modal="true">
+        <div id="tutorialHeader">
+          <div>
+            <div id="tutorialTitle">游戏教程</div>
+            <div id="tutorialSub">目标、界面含义，以及控制/驱动逻辑切换说明</div>
+          </div>
+          <button id="tutorialClose" type="button">关闭</button>
+        </div>
+        <div class="tutorialSection">
+          <div class="tutorialH">目标</div>
+          <ul class="tutorialUl">
+            <li>从起点跑到终点线，尽量用更短时间完成。</li>
+            <li>偏离道路会降速，尽量把车保持在赛道内。</li>
+          </ul>
+        </div>
+        <div class="tutorialSection">
+          <div class="tutorialH">界面说明</div>
+          <ul class="tutorialUl">
+            <li>右上角：俯视超跑入口；教程入口。</li>
+            <li>按住画面左右拖动可临时接管转向。</li>
+          </ul>
+        </div>
+        <div class="tutorialSection">
+          <div class="tutorialH">控制与驱动逻辑（重点）</div>
+          <div class="tutorialP">这个版本的转向输入有两条“驱动”来源：传感器倾斜与触控拖动。</div>
+          <div class="tutorialP">1) 传感器驱动：允许“运动与传感器”后，倾斜手机像方向盘一样转向。</div>
+          <div class="tutorialP">2) 触控接管：按住画面左右拖动即可接管转向。</div>
+          <div class="tutorialP">
+            3) 切换规则：当你开始拖动时会优先使用触控输入；停止拖动后又会回到传感器输入（如果浏览器已授权并能读到数据）。
+          </div>
+        </div>
+        <div class="tutorialSection">
+          <div class="tutorialH">小技巧</div>
+          <ul class="tutorialUl">
+            <li>iOS 需要用支持传感器的浏览器，并允许“运动与传感器”。</li>
+            <li>如果一直没反应，先试试触控拖动确认游戏正常运行。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
     <div id="wrap">
       <canvas id="game"></canvas>
     </div>
+    <script type="module">
+      const overlay = document.getElementById("tutorialOverlay");
+      const openBtn = document.getElementById("tutorialOpen");
+      const closeBtn = document.getElementById("tutorialClose");
+      const backdrop = document.getElementById("tutorialBackdrop");
+
+      const open = () => {
+        overlay.hidden = false;
+      };
+
+      const close = () => {
+        overlay.hidden = true;
+      };
+
+      openBtn?.addEventListener("click", open);
+      closeBtn?.addEventListener("click", close);
+      backdrop?.addEventListener("click", close);
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") close();
+      });
+    </script>
     <script type="module" src="./main.js?v=20260517-15"></script>
   </body>
 </html>
