@@ -242,6 +242,26 @@ const tracks = {
     ],
     elevation: () => 0,
   },
+  trackMid: {
+    id: "trackMid",
+    name: "赛道（中难）",
+    finishDistance: 12800,
+    baseSpeed: 265,
+    halfWidth: 232,
+    bends: [
+      { start: 110, length: 640, amp: -320 },
+      { start: 1120, length: 620, amp: 360 },
+      { start: 2180, length: 600, amp: -340 },
+      { start: 3160, length: 720, amp: 420 },
+      { start: 4340, length: 660, amp: -380 },
+      { start: 5420, length: 720, amp: 360 },
+      { start: 6740, length: 700, amp: -440 },
+      { start: 7920, length: 760, amp: 380 },
+      { start: 9280, length: 720, amp: -420 },
+      { start: 10780, length: 860, amp: 360 },
+    ],
+    elevation: (y) => 55 * Math.sin(y * 0.00125) + 28 * Math.sin(y * 0.00255 + 0.9),
+  },
   track2: {
     id: "track2",
     name: "赛道2（高难）",
@@ -604,7 +624,7 @@ const onPointerDown = (e) => {
     }
   }
 
-  for (const key of ["track1", "track2", "enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
+  for (const key of ["track1", "trackMid", "track2", "enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
     const r = ui.rects.get(key);
     if (r && hit(p.x, p.y, r)) {
       handleButton(key);
@@ -657,6 +677,10 @@ const setSliderByX = (key, x, rect) => {
 const handleButton = (key) => {
   if (key === "track1") {
     state.trackId = "track1";
+    resetAll();
+  }
+  if (key === "trackMid") {
+    state.trackId = "trackMid";
     resetAll();
   }
   if (key === "track2") {
@@ -1257,7 +1281,7 @@ const drawSetupUi = (w, h) => {
   const btnH = portrait ? Math.max(52, Math.floor(h * 0.062)) : Math.max(44, Math.floor(h * 0.065));
   const gap = portrait ? 12 : 10;
   const innerPad = 18;
-  const colW = (panelW - innerPad * 2 - gap) / 2;
+  const colW = (panelW - innerPad * 2 - gap * 2) / 3;
   const rowY = subY + 18;
 
   drawButton(
@@ -1267,9 +1291,15 @@ const drawSetupUi = (w, h) => {
     state.trackId === "track1" ? "primary" : "ghost",
   );
   drawButton(
-    "track2",
-    "赛道2（高难）",
+    "trackMid",
+    "中难",
     { x: x0 + innerPad + colW + gap, y: rowY, w: colW, h: btnH },
+    state.trackId === "trackMid" ? "primary" : "ghost",
+  );
+  drawButton(
+    "track2",
+    "高难",
+    { x: x0 + innerPad + (colW + gap) * 2, y: rowY, w: colW, h: btnH },
     state.trackId === "track2" ? "primary" : "ghost",
   );
 
