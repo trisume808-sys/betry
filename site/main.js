@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260516-16";
+const BUILD_ID = "20260516-17";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -970,10 +970,8 @@ const updateSim = (t) => {
   state.tilt = tiltBase;
   state.tiltRaw = sensor.raw;
 
-  const sensorSteer =
-    state.inputMode === "sensor" && state.sensorEnabled ? tiltBase * sim.gyroFlip : tiltBase;
-
-  const steerTarget = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : sensorSteer;
+  const baseSteer = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : tiltBase;
+  const steerTarget = baseSteer * (state.status === "running" ? sim.gyroFlip : 1);
 
   const follow = 1 - Math.pow(0.001, dt);
   sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.18);
@@ -986,11 +984,9 @@ const updateSim = (t) => {
 
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
-    if (state.inputMode === "sensor" && state.sensorEnabled) {
-      if (sim.elapsedMs >= sim.nextGyroFlipMs) {
-        sim.gyroFlip *= -1;
-        sim.nextGyroFlipMs = sim.elapsedMs + randRange(2500, 6500);
-      }
+    if (sim.elapsedMs >= sim.nextGyroFlipMs) {
+      sim.gyroFlip *= -1;
+      sim.nextGyroFlipMs = sim.elapsedMs + randRange(2500, 6500);
     }
 
     const baseSpeed = 260;
