@@ -453,16 +453,17 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   const steps = 56;
   const lookahead = 1100;
   const roadHalfPx = Math.min(w * 0.28, 240);
-  const curveScale = 0.22;
 
   const left = [];
   const right = [];
 
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
-    const yWorld = t * lookahead;
+    const yWorld = distance + t * lookahead;
     const c = centerX(yWorld);
-    const cx = w / 2 + c * curveScale;
+    const hw = Math.max(1, halfWidth(yWorld));
+    const scale = roadHalfPx / hw;
+    const cx = w / 2 + c * scale;
     const y = lerp(y1, y0, t);
     left.push([cx - roadHalfPx, y]);
     right.push([cx + roadHalfPx, y]);
@@ -494,48 +495,58 @@ const drawRoadFlat = (w, h, carX, distance, heading) => {
   const stripeH = 26;
   const stripeW = 6;
   const stripeGap = 18;
+  const stripePeriod = stripeH + stripeGap;
+  const stripeShift = ((distance * 0.6) % stripePeriod + stripePeriod) % stripePeriod;
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = "#e5e7eb";
-  for (let y = y1; y > y0; y -= stripeH + stripeGap) {
+  for (let y = y1 + stripeShift; y > y0 - stripePeriod; y -= stripePeriod) {
     const yy = y;
     const t = clamp((y1 - yy) / (y1 - y0), 0, 1);
-    const yWorld = t * lookahead;
+    const yWorld = distance + t * lookahead;
     const c = centerX(yWorld);
-    const cx = w / 2 + c * curveScale;
+    const hw = Math.max(1, halfWidth(yWorld));
+    const scale = roadHalfPx / hw;
+    const cx = w / 2 + c * scale;
     drawRoundRect(cx - stripeW / 2, yy - stripeH, stripeW, stripeH, 3);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  const finishT = finishDistance / lookahead;
+  const finishT = (finishDistance - distance) / lookahead;
   if (finishT > 0 && finishT < 1) {
     const y = lerp(y1, y0, finishT);
     const yWorld = finishDistance;
     const c = centerX(yWorld);
-    const cx = w / 2 + c * curveScale;
+    const hw = Math.max(1, halfWidth(yWorld));
+    const scale = roadHalfPx / hw;
+    const cx = w / 2 + c * scale;
     drawFinishBand(cx, roadHalfPx, y);
   }
 
   const carMarkerY = h * 0.74;
-  const maxOffset = roadHalfPx - 20;
-  const carX = w / 2 + heading * maxOffset * 2;
+  const carYWorld = distance;
+  const carC = centerX(carYWorld);
+  const carHw = Math.max(1, halfWidth(carYWorld));
+  const carScale = roadHalfPx / carHw;
+  const carCx = w / 2 + carC * carScale;
+  const carMarkerX = carCx + (carX - carC) * carScale;
   
   ctx.save();
   ctx.globalAlpha = 0.85;
   ctx.strokeStyle = "rgba(244,244,245,0.18)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(carX, carMarkerY - 40);
-  ctx.lineTo(carX, carMarkerY + 12);
+  ctx.moveTo(carMarkerX, carMarkerY - 40);
+  ctx.lineTo(carMarkerX, carMarkerY + 12);
   ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.fillStyle = "rgba(244,244,245,0.22)";
-  drawRoundRect(carX - 10, carMarkerY - 16, 20, 32, 6);
+  drawRoundRect(carMarkerX - 10, carMarkerY - 16, 20, 32, 6);
   ctx.fill();
   ctx.fillStyle = "rgba(52,211,153,0.92)";
   ctx.beginPath();
   ctx.save();
-  ctx.translate(carX, carMarkerY - 18);
+  ctx.translate(carMarkerX, carMarkerY - 18);
   ctx.rotate(heading);
   ctx.moveTo(0, -10);
   ctx.lineTo(8, 10);
@@ -817,22 +828,60 @@ const updateSim = (t) => {
 
   const steerTarget = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : tilt;
 
+  const follow = 1 - Math.pow(0.001, dt);
+  sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.18);
+  state.tiltSmooth = sim.steerSmooth;
+
+  const maxHeadingRad = 0.85;
+  const targetHeading = steerTarget * maxHeadingRad;
+  sim.heading = lerp(sim.heading, targetHeading, 55 * dt);
+  sim.steerAngle = sim.heading;
+
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
-    const maxHeadingRad = 0.85;
-    const targetHeading = steerTarget * maxHeadingRad;
-    const followRate = 55;
-    sim.heading = lerp(sim.heading, targetHeading, followRate * dt);
-    sim.steerAngle = sim.heading;
+
+    const baseSpeed = 260;
+    const y = sim.distance;
+    const c = centerX(y);
+    const hw = halfWidth(y);
+    const carHalf = 12;
+    const offroad = Math.abs(sim.x - c) > hw - carHalf;
+    const speed = baseSpeed * (offroad ? 0.55 : 1);
+
+    sim.distance += speed * dt;
+
+    const steer = sim.steerSmooth * state.sensitivity * state.steerStrength;
+    sim.x += steer * speed * dt * 0.85;
+
+    if (!touch.active && Math.abs(steerTarget) < 0.02) {
+      sim.x *= Math.pow(0.92, (dtMs / 16.7) * (state.returnRate / 7.5));
+    }
+
+    const ny = sim.distance;
+    const nc = centerX(ny);
+    const nhw = halfWidth(ny);
+    if (Math.abs(sim.x - nc) > nhw - carHalf) {
+      sim.x = nc + clamp(sim.x - nc, -(nhw - carHalf), nhw - carHalf);
+    }
+
+    if (sim.distance >= finishDistance) {
+      sim.distance = finishDistance;
+      if (state.finishMs == null) state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
+      state.status = "setup";
+    }
   }
 
-  sim.steerSmooth = steerTarget;
-  state.tiltSmooth = steerTarget;
+  const yNow = sim.distance;
+  const cNow = centerX(yNow);
+  const hwNow = halfWidth(yNow);
+  const carHalfNow = 12;
+  const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > hwNow - carHalfNow;
+  const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
-  state.speed = 0;
-  state.offroad = false;
+  state.speed = speedNow;
+  state.offroad = offroadNow;
 
   drawFrame(w, h);
 };
