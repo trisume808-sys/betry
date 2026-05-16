@@ -2,6 +2,7 @@ const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
 const BUILD_ID = "20260516-1";
+const PENALTY_RATE = 2;
 
 const track = {
   halfWidth: 250,
@@ -47,6 +48,7 @@ const state = {
   sensorPermission: "unknown",
   sensorEnabled: false,
   sensorSupported: true,
+  rulesMode: "penalty",
   sensitivity: 3.2,
   steerStrength: 1.25,
   returnRate: 7.5,
@@ -58,6 +60,7 @@ const state = {
   distance: 0,
   speed: 0,
   offroad: false,
+  penaltyMs: 0,
   finishMs: null,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
@@ -75,6 +78,7 @@ const sim = {
   roadAngle: 0,
   distance: 0,
   elapsedMs: 0,
+  penaltyMs: 0,
   steerSmooth: 0,
   steerAngle: 0,
   gyroFlip: 1,
@@ -210,12 +214,14 @@ const resetRun = () => {
   state.distance = 0;
   state.speed = 0;
   state.offroad = false;
+  state.penaltyMs = 0;
   state.tiltSmooth = 0;
   sim.x = 0;
   sim.heading = 0;
   sim.roadAngle = 0;
   sim.distance = 0;
   sim.elapsedMs = 0;
+  sim.penaltyMs = 0;
   sim.steerSmooth = 0;
   sim.steerAngle = 0;
   sim.gyroFlip = 1;
@@ -331,7 +337,7 @@ const onPointerDown = (e) => {
     }
   }
 
-  for (const key of ["enable", "calibrate", "start", "touch", "fs", "exitfs"]) {
+  for (const key of ["enable", "calibrate", "start", "touch", "mode", "fs", "exitfs"]) {
     const r = ui.rects.get(key);
     if (r && hit(p.x, p.y, r)) {
       handleButton(key);
@@ -386,6 +392,7 @@ const handleButton = (key) => {
   if (key === "calibrate") calibrate();
   if (key === "start") startRun();
   if (key === "touch") setInputTouch();
+  if (key === "mode") state.rulesMode = state.rulesMode === "penalty" ? "wall" : "penalty";
   if (key === "fs") toggleFullscreenLandscape();
   if (key === "exitfs") exitFullscreen();
 };
@@ -793,10 +800,13 @@ const drawSetupUi = (w, h) => {
   drawButton("start", "开始", { x: x0 + 14, y: rowY + btnH + gap, w: colW, h: btnH }, "primary");
   drawButton("touch", "触控模式", { x: x0 + 14 + colW + gap, y: rowY + btnH + gap, w: colW, h: btnH }, "ghost");
 
-  drawButton("fs", "横屏全屏", { x: x0 + 14, y: rowY + (btnH + gap) * 2, w: colW, h: btnH }, "ghost");
-  drawButton("exitfs", "退出全屏", { x: x0 + 14 + colW + gap, y: rowY + (btnH + gap) * 2, w: colW, h: btnH }, "ghost");
+  const modeLabel = state.rulesMode === "penalty" ? "模式：出线罚时" : "模式：硬墙限制";
+  drawButton("mode", modeLabel, { x: x0 + 14, y: rowY + (btnH + gap) * 2, w: panelW - 28, h: btnH }, "ghost");
 
-  const sliderY = rowY + (btnH + gap) * 3 + 4;
+  drawButton("fs", "横屏全屏", { x: x0 + 14, y: rowY + (btnH + gap) * 3, w: colW, h: btnH }, "ghost");
+  drawButton("exitfs", "退出全屏", { x: x0 + 14 + colW + gap, y: rowY + (btnH + gap) * 3, w: colW, h: btnH }, "ghost");
+
+  const sliderY = rowY + (btnH + gap) * 4 + 4;
   const sliderH = Math.max(34, Math.floor(h * 0.045));
   drawSlider("sensitivity", { x: x0 + 14, y: sliderY, w: panelW - 28, h: sliderH }, state.sensitivity, 0.6, 8, "灵敏度");
   drawSlider(
@@ -839,15 +849,25 @@ const drawRunUi = (w, h) => {
   ui.rects.clear();
   const pad = 14;
   const boxW = Math.min(w * 0.42, 270);
+  const showPenalty = state.rulesMode === "penalty";
   ctx.save();
   ctx.fillStyle = "rgba(10,10,18,0.55)";
-  drawRoundRect(pad, pad + 62, boxW, 44, 16);
+  drawRoundRect(pad, pad + 62, boxW, showPenalty ? 78 : 44, 16);
   ctx.fill();
   ctx.fillStyle = "rgba(244,244,245,0.9)";
   ctx.font = `${Math.max(12, Math.floor(w * 0.018))}px ui-sans-serif, system-ui`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(`计时 ${formatMs(state.finishMs ?? state.elapsedMs)}`, pad + 12, pad + 92);
+  if (!showPenalty) {
+    ctx.fillText(`计时 ${formatMs(state.finishMs ?? state.elapsedMs)}`, pad + 12, pad + 92);
+  } else {
+    const raw = state.elapsedMs;
+    const pen = state.penaltyMs;
+    const total = state.finishMs ?? Math.max(0, Math.floor(raw + pen));
+    ctx.fillText(`用时 ${formatMs(raw)}`, pad + 12, pad + 90);
+    ctx.fillText(`罚时 +${formatMs(pen)}`, pad + 12, pad + 110);
+    ctx.fillText(`总计 ${formatMs(total)}`, pad + 12, pad + 130);
+  }
   ctx.restore();
 
   const btnW = Math.min(w * 0.6, 360);
@@ -893,13 +913,15 @@ const updateSim = (t) => {
       }
     }
 
+    const mode = state.rulesMode;
     const baseSpeed = 260;
     const y = sim.distance;
     const c = centerX(y);
     const hw = halfWidth(y);
     const carHalf = 12;
-    const offroad = Math.abs(sim.x - c) > hw - carHalf;
-    const speed = baseSpeed * (offroad ? 0.55 : 1);
+    const limit = hw - carHalf;
+    const outside = Math.abs(sim.x - c) > limit;
+    const speed = baseSpeed * (outside ? (mode === "penalty" ? 0.55 : 0.82) : 1);
 
     sim.distance += speed * dt;
 
@@ -913,13 +935,24 @@ const updateSim = (t) => {
     const ny = sim.distance;
     const nc = centerX(ny);
     const nhw = halfWidth(ny);
-    if (Math.abs(sim.x - nc) > nhw - carHalf) {
-      sim.x = nc + clamp(sim.x - nc, -(nhw - carHalf), nhw - carHalf);
+    const nlimit = nhw - carHalf;
+    const nx = sim.x - nc;
+    let offroadAfter = Math.abs(nx) > nlimit;
+    if (mode === "wall") {
+      if (offroadAfter) sim.x = nc + clamp(nx, -nlimit, nlimit);
+      offroadAfter = false;
+    } else {
+      if (offroadAfter) sim.penaltyMs += dtMs * PENALTY_RATE;
+      const cap = nlimit * 2.2;
+      if (Math.abs(nx) > cap) sim.x = nc + clamp(nx, -cap, cap);
     }
 
     if (sim.distance >= finishDistance) {
       sim.distance = finishDistance;
-      if (state.finishMs == null) state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
+      if (state.finishMs == null) {
+        const total = sim.elapsedMs + (mode === "penalty" ? sim.penaltyMs : 0);
+        state.finishMs = Math.max(0, Math.floor(total));
+      }
       state.status = "setup";
     }
   }
@@ -928,14 +961,21 @@ const updateSim = (t) => {
   const cNow = centerX(yNow);
   const hwNow = halfWidth(yNow);
   const carHalfNow = 12;
-  const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > hwNow - carHalfNow;
-  const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
+  const offroadNow =
+    state.status === "running" &&
+    state.rulesMode === "penalty" &&
+    Math.abs(sim.x - cNow) > hwNow - carHalfNow;
+  const speedNow =
+    state.status === "running"
+      ? 260 * (offroadNow ? 0.55 : 1)
+      : 0;
   sim.roadAngle = roadAngleAt(yNow);
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
   state.speed = speedNow;
   state.offroad = offroadNow;
+  state.penaltyMs = Math.max(0, Math.floor(sim.penaltyMs));
 
   drawFrame(w, h);
 };
