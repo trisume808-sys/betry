@@ -17,7 +17,7 @@ function Button(props: {
       onClick={props.onClick}
       disabled={props.disabled}
       className={cn(
-        "inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-medium transition active:scale-[0.99] disabled:opacity-50",
+        "inline-flex h-9 items-center justify-center rounded-lg px-3 text-xs font-medium transition active:scale-[0.99] disabled:opacity-50",
         variant === "primary"
           ? "bg-emerald-400 text-zinc-950 hover:bg-emerald-300"
           : "bg-zinc-900 text-zinc-100 hover:bg-zinc-800",
@@ -43,7 +43,7 @@ function Slider(props: {
       step={props.step}
       value={props.value}
       onChange={(e) => props.onChange(Number(e.target.value))}
-      className="h-2 w-full cursor-pointer accent-emerald-400"
+      className="h-1.5 w-full cursor-pointer accent-emerald-400"
     />
   );
 }
@@ -166,20 +166,20 @@ export default function ControlsPanel() {
     (!sensorEnabled || sensorPermission !== "granted" || !sensorSupported);
 
   return (
-    <div className="rounded-2xl bg-zinc-900/60 p-3 backdrop-blur">
+    <div className="rounded-xl bg-zinc-900/60 p-2.5 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium">控制</div>
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs font-medium">控制</div>
+          <div className="text-[11px] leading-tight text-zinc-400">
             倾斜像方向盘一样转向，或用触控左右拖动兜底
           </div>
         </div>
-        <div className="shrink-0 rounded-xl bg-zinc-950/60 px-3 py-2 text-xs text-zinc-200">
+        <div className="shrink-0 rounded-lg bg-zinc-950/60 px-2.5 py-1.5 text-[11px] text-zinc-200">
           校准 {calibration.toFixed(2)}
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-2">
         {showEnable ? (
           <Button onClick={enableSensor} variant="primary">
             {promptRequired ? "启用传感器（点我）" : "启用传感器"}
@@ -219,7 +219,7 @@ export default function ControlsPanel() {
         </Button>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-2.5">
         <div className="mb-2 flex items-center justify-between text-xs text-zinc-400">
           <div>灵敏度</div>
           <div className="tabular-nums">{sensitivity.toFixed(2)}</div>
@@ -233,7 +233,7 @@ export default function ControlsPanel() {
         />
       </div>
 
-      <div className="mt-3 text-xs text-zinc-400">
+      <div className="mt-2.5 text-[11px] text-zinc-400">
         <div className="flex items-center justify-between">
           <div className="tabular-nums">
             倾斜 {telemetry.tilt.toFixed(2)} / 平滑 {telemetry.tiltSmooth.toFixed(2)}
