@@ -897,7 +897,10 @@ const updateSim = (t) => {
     const y = sim.distance;
     const c = centerX(y);
     const hw = halfWidth(y);
-    const carHalf = 12;
+    const roadHalfPx = Math.min(w * 0.28, 240);
+    const scale = roadHalfPx / Math.max(1, hw);
+    const carHalfPx = 10;
+    const carHalf = carHalfPx / Math.max(0.001, scale);
     const offroad = Math.abs(sim.x - c) > hw - carHalf;
     const speed = baseSpeed * (offroad ? 0.55 : 1);
 
@@ -913,8 +916,10 @@ const updateSim = (t) => {
     const ny = sim.distance;
     const nc = centerX(ny);
     const nhw = halfWidth(ny);
-    if (Math.abs(sim.x - nc) > nhw - carHalf) {
-      sim.x = nc + clamp(sim.x - nc, -(nhw - carHalf), nhw - carHalf);
+    const nscale = roadHalfPx / Math.max(1, nhw);
+    const ncarHalf = carHalfPx / Math.max(0.001, nscale);
+    if (Math.abs(sim.x - nc) > nhw - ncarHalf) {
+      sim.x = nc + clamp(sim.x - nc, -(nhw - ncarHalf), nhw - ncarHalf);
     }
 
     if (sim.distance >= finishDistance) {
@@ -927,7 +932,10 @@ const updateSim = (t) => {
   const yNow = sim.distance;
   const cNow = centerX(yNow);
   const hwNow = halfWidth(yNow);
-  const carHalfNow = 12;
+  const roadHalfPxNow = Math.min(w * 0.28, 240);
+  const scaleNow = roadHalfPxNow / Math.max(1, hwNow);
+  const carHalfPxNow = 10;
+  const carHalfNow = carHalfPxNow / Math.max(0.001, scaleNow);
   const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > hwNow - carHalfNow;
   const speedNow = state.status === "running" ? 260 * (offroadNow ? 0.55 : 1) : 0;
   sim.roadAngle = roadAngleAt(yNow);
