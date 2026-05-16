@@ -813,17 +813,17 @@ const updateSim = (t) => {
   state.tiltRaw = sensor.raw;
 
   const steerTarget = state.inputMode === "touch" || !state.sensorEnabled ? touch.steer : tilt;
-  const follow = 1 - Math.pow(0.001, dt);
-  sim.steerSmooth = lerp(sim.steerSmooth, steerTarget, follow * 0.32);
-  state.tiltSmooth = sim.steerSmooth;
 
   if (state.status === "running") {
     sim.elapsedMs += dtMs;
-    const maxHeadingRad = 0.75;
+    const maxHeadingRad = 0.85;
     const targetHeading = steerTarget * maxHeadingRad;
-    const followRate = 22;
+    const followRate = 55;
     sim.heading = lerp(sim.heading, targetHeading, followRate * dt);
   }
+
+  sim.steerSmooth = steerTarget;
+  state.tiltSmooth = steerTarget;
 
   state.elapsedMs = Math.max(0, Math.floor(sim.elapsedMs));
   state.distance = sim.distance;
