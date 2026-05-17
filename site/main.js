@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-24";
+const BUILD_ID = "20260517-25";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -368,6 +368,52 @@ const getRiskZone = (trackId) => {
 
 const elevation = (y) => getTrack().elevation(y);
 
+const intersects = (a0, a1, b0, b1, pad = 0) => a0 <= b1 + pad && a1 + pad >= b0;
+
+const pickEventCard = () => {
+  const cards = [
+    { id: "extra_narrow", name: "额外窄路", kind: "extra_narrow" },
+    { id: "narrow_harder", name: "窄路更窄", kind: "narrow_scale", scale: 0.78 },
+  ];
+  return cards[Math.floor(Math.random() * cards.length)];
+};
+
+const makeExtraNarrowSegment = (track) => {
+  const fd = Math.max(1, track.finishDistance || 1);
+  const baseHw = Math.max(1, track.halfWidth || 1);
+  const existing = Array.isArray(track.narrowSegments) ? track.narrowSegments : [];
+  const risks = Array.isArray(track.riskZones) ? track.riskZones : [];
+  const len = clamp(Math.floor(fd * 0.085), 720, 1120);
+  const minHalfWidth = clamp(Math.floor(baseHw * 0.30), 60, Math.floor(baseHw * 0.55));
+
+  for (let i = 0; i < 14; i += 1) {
+    const start = Math.floor(randRange(fd * 0.18, fd * 0.86 - len));
+    const end = start + len;
+    if (end > fd - 220) continue;
+    let ok = true;
+    for (const seg of existing) {
+      const s0 = seg?.start ?? 0;
+      const s1 = s0 + (seg?.length ?? 0);
+      if (intersects(start, end, s0, s1, 260)) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) continue;
+    for (const z of risks) {
+      const z0 = z?.start ?? 0;
+      const z1 = z?.end ?? z0;
+      if (intersects(start, end, z0, z1, 260)) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) continue;
+    return { start, length: len, minHalfWidth };
+  }
+  return null;
+};
+
 const centerX = (y) => {
   let x = 0;
   for (const b of getTrack().bends) {
@@ -378,8 +424,16 @@ const centerX = (y) => {
 };
 
 const getNarrowSegment = (y) => {
+  if (typeof y !== "number") return null;
+  const list0 = Array.isArray(sim.sessionNarrowSegments) ? sim.sessionNarrowSegments : [];
+  for (const seg of list0) {
+    const start = seg?.start ?? 0;
+    const len = seg?.length ?? 0;
+    const end = start + len;
+    if (y >= start && y <= end) return seg;
+  }
   const list = getTrack().narrowSegments;
-  if (!Array.isArray(list) || typeof y !== "number") return null;
+  if (!Array.isArray(list)) return null;
   for (const seg of list) {
     const start = seg?.start ?? 0;
     const len = seg?.length ?? 0;
@@ -403,7 +457,8 @@ const halfWidth = (y = 0) => {
         : typeof seg.halfWidth === "number"
           ? seg.halfWidth
           : base;
-    return lerp(base, Math.min(base, minW), ease);
+    const m = clamp(typeof sim.narrowScale === "number" ? sim.narrowScale : 1, 0.55, 1);
+    return lerp(base, Math.min(base, minW * m), ease);
   }
   return base;
 };
@@ -442,6 +497,9 @@ const sim = {
   toastText: "",
   toastKind: "info",
   narrowSeen: new Set(),
+  event: null,
+  narrowScale: 1,
+  sessionNarrowSegments: [],
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -611,8 +669,26 @@ const resetRun = () => {
   sim.toastText = "";
   sim.toastKind = "info";
   sim.narrowSeen = new Set();
+  sim.event = null;
+  sim.narrowScale = 1;
+  sim.sessionNarrowSegments = [];
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
+
+  const track = getTrack();
+  const card = pickEventCard();
+  sim.event = card;
+  if (card?.kind === "narrow_scale") sim.narrowScale = card.scale ?? 1;
+  if (card?.kind === "extra_narrow") {
+    const seg = makeExtraNarrowSegment(track);
+    if (seg) sim.sessionNarrowSegments = [seg];
+  }
+
+  if (sim.event?.name) {
+    sim.toastText = `本局事件：${sim.event.name}`;
+    sim.toastKind = "info";
+    sim.toastUntil = 1600;
+  }
 };
 
 const startRun = () => {
@@ -923,9 +999,10 @@ const makeShareText = (entry, rank) => {
   const score = entry?.score ?? 0;
   const penalty = entry?.penalty ?? 0;
   const bonus = entry?.bonus ?? 0;
+  const event = entry?.event ? `｜事件 ${entry.event}` : "";
   const rk = typeof rank === "number" ? `第${rank + 1}名` : "";
   const b = bonus > 0 ? `｜净跑奖励 +${bonus}` : "";
-  return `零点漂移｜${trackLabel}｜得分 ${score}${b}｜用时 ${time}｜扣分 ${penalty}${rk ? `｜好友榜 ${rk}` : ""}`;
+  return `零点漂移｜${trackLabel}${event}｜得分 ${score}${b}｜用时 ${time}｜扣分 ${penalty}${rk ? `｜好友榜 ${rk}` : ""}`;
 };
 
 const makeShareImage = (entry, rank) => {
@@ -981,6 +1058,11 @@ const makeShareImage = (entry, rank) => {
     g.font = "600 20px ui-sans-serif, system-ui";
     g.fillStyle = "rgba(167,243,208,0.92)";
     g.fillText(String(trackLabel), pad + 28, pad + 106);
+    if (entry?.event) {
+      g.font = "600 18px ui-sans-serif, system-ui";
+      g.fillStyle = "rgba(226,232,240,0.78)";
+      g.fillText(String(entry.event), pad + 28, pad + 132);
+    }
 
     const score = entry?.score ?? 0;
     const time = entry?.timeMs != null ? formatMs(entry.timeMs) : "";
@@ -1938,6 +2020,11 @@ const drawResultUi = (w, h) => {
   ctx.fillStyle = "rgba(167,243,208,0.92)";
   ctx.font = `600 ${subFs}px ui-sans-serif, system-ui`;
   ctx.fillText(`${getTrack().name ?? state.trackId}`, x0 + innerPad, y0 + 68);
+  if (entry.event) {
+    ctx.fillStyle = "rgba(226,232,240,0.78)";
+    ctx.font = `600 ${Math.max(11, Math.floor(subFs * 0.95))}px ui-sans-serif, system-ui`;
+    ctx.fillText(`${entry.event}`, x0 + innerPad, y0 + 90);
+  }
 
   ctx.fillStyle = "rgba(34,211,238,0.92)";
   ctx.font = `700 ${Math.floor(titleFs * 0.92)}px ui-sans-serif, system-ui`;
@@ -2133,6 +2220,7 @@ const updateSim = (t) => {
         id: `me_${ts}`,
         name: state.playerName,
         trackId: state.trackId,
+        event: sim.event?.name ?? "",
         score: state.score,
         bonus: state.bonus,
         timeMs: state.finishMs,
