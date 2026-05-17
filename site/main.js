@@ -344,6 +344,7 @@ const state = {
   finishMs: null,
   animMs: 0,
   playerName: "你",
+  friendsOverlay: false,
   lastResult: null,
   build: (import.meta?.env?.VITE_BUILD_ID ?? BUILD_ID).slice(0, 16),
 };
@@ -777,6 +778,27 @@ const onPointerDown = (e) => {
   const p = pointerToCanvas(e);
   ui.pointerDown = p;
 
+  const exitBtn = ui.rects.get("exitfs");
+  if (exitBtn && hit(p.x, p.y, exitBtn)) {
+    handleButton("exitfs");
+    return;
+  }
+
+  if (state.friendsOverlay) {
+    state.friendsOverlay = false;
+    return;
+  }
+
+  const friendsBtn = ui.rects.get("friends");
+  if (friendsBtn && hit(p.x, p.y, friendsBtn)) {
+    state.friendsOverlay = true;
+    ui.sliderActive = false;
+    ui.sliderKey = null;
+    touch.active = false;
+    touch.steer = 0;
+    return;
+  }
+
   if (state.status === "running") {
     const exitBtn = ui.rects.get("exitfs");
     if (exitBtn && hit(p.x, p.y, exitBtn)) {
@@ -815,6 +837,7 @@ const onPointerDown = (e) => {
 const onPointerMove = (e) => {
   const p = pointerToCanvas(e);
   if (state.status === "running") {
+    if (state.friendsOverlay) return;
     if (!touch.active) return;
     const r = canvas.getBoundingClientRect();
     const ratio = canvas.width / r.width;
@@ -1783,6 +1806,68 @@ const drawToast = (w, h) => {
   ctx.restore();
 };
 
+const drawFriendsButton = (w, h) => {
+  if (state.friendsOverlay) return;
+  const pad = 14;
+  const btnW = clamp(Math.floor(w * 0.26), 120, 180);
+  const btnH = 38;
+  const safeTop =
+    Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-top)"),
+    ) || 0;
+  const y = pad + safeTop + (document.fullscreenElement ? 46 : 0);
+  const x = Math.max(pad, w - pad - btnW);
+  drawButton("friends", "好友竞赛", { x, y, w: btnW, h: btnH }, "ghost");
+};
+
+const drawFriendsOverlay = (w, h) => {
+  if (!state.friendsOverlay) return;
+  const pad = 18;
+  const panelW = Math.min(w - pad * 2, 560);
+  const panelH = Math.min(h - pad * 2, 360);
+  const x0 = (w - panelW) / 2;
+  const y0 = (h - panelH) / 2;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.62)";
+  ctx.fillRect(0, 0, w, h);
+
+  const bg = ctx.createLinearGradient(0, y0, 0, y0 + panelH);
+  bg.addColorStop(0, "rgba(10,10,18,0.90)");
+  bg.addColorStop(1, "rgba(9,9,11,0.70)");
+  ctx.fillStyle = bg;
+  drawRoundRect(x0, y0, panelW, panelH, 22);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(244,244,245,0.12)";
+  ctx.stroke();
+
+  const base = Math.min(w, h);
+  const titleFs = Math.max(16, Math.floor(base * 0.045));
+  const subFs = Math.max(12, Math.floor(base * 0.028));
+  const textX = x0 + panelW / 2;
+  const titleY = y0 + 56;
+
+  ctx.fillStyle = "rgba(226,232,240,0.92)";
+  ctx.font = `800 ${titleFs}px ui-sans-serif, system-ui`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("好友竞赛（Demo）", textX, titleY);
+
+  ctx.font = `600 ${subFs}px ui-sans-serif, system-ui`;
+  ctx.fillStyle = "rgba(161,161,170,0.95)";
+  ctx.fillText("纯离线：先用挑战码/成绩码交换", textX, titleY + 34);
+  ctx.fillText("后面再做：好友榜对比 & 分享", textX, titleY + 58);
+
+  const btnW = Math.min(240, panelW - 40);
+  const btnH = 44;
+  const btnX = x0 + (panelW - btnW) / 2;
+  const btnY = y0 + panelH - btnH - 18;
+  drawButton("friendsClose", "关闭", { x: btnX, y: btnY, w: btnW, h: btnH }, "primary");
+
+  ctx.restore();
+};
+
 const drawFullscreenExitOverlay = (w, h) => {
   if (!document.fullscreenElement) return;
   const pad = 14;
@@ -2277,8 +2362,10 @@ const drawFrame = (w, h) => {
   if (state.status === "running") drawRunUi(w, h);
   else if (state.status === "result") drawResultUi(w, h);
   else drawSetupUi(w, h);
+  drawFriendsButton(w, h);
   drawPostFx(w, h);
   drawToast(w, h);
+  drawFriendsOverlay(w, h);
   drawFullscreenExitOverlay(w, h);
 };
 
