@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-20";
+const BUILD_ID = "20260517-21";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -246,7 +246,7 @@ const tracks = {
     finishDistance: 12400,
     baseSpeed: 260,
     halfWidth: 250,
-    narrowSegments: [{ start: 3800, length: 720, halfWidth: 175 }],
+    narrowSegments: [{ start: 3600, length: 1200, minHalfWidth: 140, ramp: 260 }],
     bends: [
       { start: 120, length: 680, amp: -260 },
       { start: 1480, length: 780, amp: 320 },
@@ -346,6 +346,7 @@ const getTrack = () => tracks[state.trackId] ?? tracks.track1;
 
 const getRiskZone = (trackId) => {
   const t = tracks[trackId] ?? tracks.track1;
+  if (Array.isArray(t.narrowSegments) && t.narrowSegments.length) return null;
   const fd = Math.max(1, t.finishDistance || 1);
   const start = Math.floor(fd * 0.28);
   const len = Math.min(1100, Math.max(520, Math.floor(fd * 0.1)));
@@ -380,7 +381,24 @@ const getNarrowSegment = (y) => {
 const halfWidth = (y = 0) => {
   const base = getTrack().halfWidth;
   const seg = getNarrowSegment(y);
-  if (seg && typeof seg.halfWidth === "number") return Math.min(base, seg.halfWidth);
+  if (seg) {
+    const len = Math.max(1, seg.length ?? 0);
+    const ramp0 = typeof seg.ramp === "number" ? seg.ramp : 220;
+    const ramp = clamp(ramp0, 40, len * 0.5);
+    const start = seg.start ?? 0;
+    const end = start + len;
+    const tIn = clamp((y - start) / Math.max(1, ramp), 0, 1);
+    const tOut = clamp((end - y) / Math.max(1, ramp), 0, 1);
+    const t = Math.min(tIn, tOut);
+    const ease = t * t * (3 - 2 * t);
+    const minW =
+      typeof seg.minHalfWidth === "number"
+        ? seg.minHalfWidth
+        : typeof seg.halfWidth === "number"
+          ? seg.halfWidth
+          : base;
+    return lerp(base, Math.min(base, minW), ease);
+  }
   return base;
 };
 
