@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-16";
+const BUILD_ID = "20260517-17";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -332,6 +332,7 @@ const state = {
   speed: 0,
   offroad: false,
   penalty: 0,
+  bonus: 0,
   score: 0,
   finishMs: null,
   animMs: 0,
@@ -341,6 +342,15 @@ const state = {
 };
 
 const getTrack = () => tracks[state.trackId] ?? tracks.track1;
+
+const getRiskZone = (trackId) => {
+  const t = tracks[trackId] ?? tracks.track1;
+  const fd = Math.max(1, t.finishDistance || 1);
+  const start = Math.floor(fd * 0.6);
+  const end = Math.min(fd - 320, Math.floor(fd * 0.78));
+  if (end <= start + 220) return null;
+  return { start, end, bonus: 5, entered: false, invalid: false, done: false };
+};
 
 const elevation = (y) => getTrack().elevation(y);
 
@@ -381,6 +391,9 @@ const sim = {
   lastPenaltyMs: 0,
   penaltyFlashUntil: 0,
   lastPenaltyDelta: 0,
+  risk: null,
+  bonusFlashUntil: 0,
+  bonusLast: 0,
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -527,6 +540,7 @@ const resetRun = () => {
   state.speed = 0;
   state.offroad = false;
   state.penalty = 0;
+  state.bonus = 0;
   state.score = SCORE_BASE;
   state.tiltSmooth = 0;
   sim.x = 0;
@@ -541,6 +555,9 @@ const resetRun = () => {
   sim.lastPenaltyMs = 0;
   sim.penaltyFlashUntil = 0;
   sim.lastPenaltyDelta = 0;
+  sim.risk = getRiskZone(state.trackId);
+  sim.bonusFlashUntil = 0;
+  sim.bonusLast = 0;
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
@@ -852,8 +869,10 @@ const makeShareText = (entry, rank) => {
   const time = entry?.timeMs != null ? formatMs(entry.timeMs) : "";
   const score = entry?.score ?? 0;
   const penalty = entry?.penalty ?? 0;
+  const bonus = entry?.bonus ?? 0;
   const rk = typeof rank === "number" ? `第${rank + 1}名` : "";
-  return `零点漂移｜${trackLabel}｜得分 ${score}｜用时 ${time}｜扣分 ${penalty}${rk ? `｜好友榜 ${rk}` : ""}`;
+  const b = bonus > 0 ? `｜净跑奖励 +${bonus}` : "";
+  return `零点漂移｜${trackLabel}｜得分 ${score}${b}｜用时 ${time}｜扣分 ${penalty}${rk ? `｜好友榜 ${rk}` : ""}`;
 };
 
 const makeShareImage = (entry, rank) => {
@@ -913,6 +932,7 @@ const makeShareImage = (entry, rank) => {
     const score = entry?.score ?? 0;
     const time = entry?.timeMs != null ? formatMs(entry.timeMs) : "";
     const penalty = entry?.penalty ?? 0;
+    const bonus = entry?.bonus ?? 0;
     g.font = "700 56px ui-sans-serif, system-ui";
     g.fillStyle = "rgba(34,211,238,0.92)";
     g.fillText(`得分 ${score}`, pad + 28, pad + 182);
@@ -920,7 +940,7 @@ const makeShareImage = (entry, rank) => {
     g.font = "600 26px ui-sans-serif, system-ui";
     g.fillStyle = "rgba(226,232,240,0.86)";
     g.fillText(`用时 ${time}`, pad + 28, pad + 232);
-    g.fillText(`扣分 ${penalty}`, pad + 28, pad + 272);
+    g.fillText(`扣分 ${penalty}${bonus > 0 ? ` ｜净跑+${bonus}` : ""}`, pad + 28, pad + 272);
 
     if (typeof rank === "number") {
       g.font = "700 26px ui-sans-serif, system-ui";
@@ -1525,7 +1545,25 @@ const drawTopHud = (w, h) => {
   ctx.textAlign = "right";
   ctx.fillText(`得分 ${state.score}`, pad + boxW - 14, pad + 74);
 
-  if (state.offroad) {
+  const inRisk =
+    state.status === "running" &&
+    sim.risk &&
+    !sim.risk.done &&
+    state.distance >= sim.risk.start &&
+    state.distance <= sim.risk.end &&
+    !sim.risk.invalid;
+
+  if (sim.bonusFlashUntil > sim.elapsedMs) {
+    ctx.fillStyle = "rgba(52,211,153,0.92)";
+    ctx.textAlign = "left";
+    ctx.font = `${subFs}px ui-sans-serif, system-ui`;
+    ctx.fillText(`净跑奖励 +${sim.bonusLast}`, pad + 14, pad + 102);
+  } else if (inRisk) {
+    ctx.fillStyle = "rgba(34,211,238,0.86)";
+    ctx.textAlign = "left";
+    ctx.font = `${subFs}px ui-sans-serif, system-ui`;
+    ctx.fillText(`净跑区：不碰墙/不越界 +${sim.risk.bonus}`, pad + 14, pad + 102);
+  } else if (state.offroad) {
     ctx.fillStyle = "rgba(248,113,113,0.92)";
     ctx.textAlign = "left";
     ctx.font = `${subFs}px ui-sans-serif, system-ui`;
@@ -1788,7 +1826,11 @@ const drawResultUi = (w, h) => {
 
   ctx.fillStyle = "rgba(34,211,238,0.92)";
   ctx.font = `700 ${Math.floor(titleFs * 0.92)}px ui-sans-serif, system-ui`;
-  ctx.fillText(`得分 ${entry.score}`, x0 + innerPad, y0 + 110);
+  ctx.fillText(
+    `得分 ${entry.score}${entry.bonus > 0 ? `（净跑+${entry.bonus}）` : ""}`,
+    x0 + innerPad,
+    y0 + 110,
+  );
 
   ctx.fillStyle = "rgba(226,232,240,0.86)";
   ctx.font = `600 ${metricFs}px ui-sans-serif, system-ui`;
@@ -1922,16 +1964,32 @@ const updateSim = (t) => {
     }
     sim.x = nc + clampedDelta;
 
+    if (sim.risk && !sim.risk.done) {
+      const inZone = sim.distance >= sim.risk.start && sim.distance <= sim.risk.end;
+      if (inZone) {
+        sim.risk.entered = true;
+        if (offroadNow || hitWall) sim.risk.invalid = true;
+      } else if (sim.risk.entered && sim.distance > sim.risk.end) {
+        if (!sim.risk.invalid) {
+          state.bonus += sim.risk.bonus;
+          sim.bonusLast = sim.risk.bonus;
+          sim.bonusFlashUntil = sim.elapsedMs + 900;
+        }
+        sim.risk.done = true;
+      }
+    }
+
     if (sim.distance >= fd) {
       sim.distance = fd;
       if (state.finishMs == null) state.finishMs = Math.max(0, Math.floor(sim.elapsedMs));
-      state.score = calcScore(state.finishMs, state.penalty);
+      state.score = calcScore(state.finishMs, state.penalty) + state.bonus;
       const ts = Date.now();
       const entry = {
         id: `me_${ts}`,
         name: state.playerName,
         trackId: state.trackId,
         score: state.score,
+        bonus: state.bonus,
         timeMs: state.finishMs,
         penalty: state.penalty,
         ts,
@@ -1968,7 +2026,7 @@ const updateSim = (t) => {
   state.speed = speedNow;
   state.offroad = offroadNow || dangerNow;
   state.penalty = Math.max(0, Math.floor(state.penalty));
-  state.score = calcScore(state.finishMs ?? state.elapsedMs, state.penalty);
+  state.score = calcScore(state.finishMs ?? state.elapsedMs, state.penalty) + state.bonus;
 
   perf.frame += 1;
   if (perf.frame % perf.renderEvery === 0) drawFrame(w, h);
