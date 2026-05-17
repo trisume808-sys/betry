@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-23";
+const BUILD_ID = "20260517-24";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -247,6 +247,7 @@ const tracks = {
     baseSpeed: 260,
     halfWidth: 250,
     narrowSegments: [{ start: 3600, length: 1100, minHalfWidth: 90 }],
+    riskZones: [{ start: 2100, end: 2800, bonus: 5 }],
     bends: [
       { start: 120, length: 680, amp: -260 },
       { start: 1480, length: 780, amp: 320 },
@@ -265,6 +266,11 @@ const tracks = {
     finishDistance: 12800,
     baseSpeed: 265,
     halfWidth: 232,
+    narrowSegments: [
+      { start: 5200, length: 900, minHalfWidth: 82 },
+      { start: 9100, length: 980, minHalfWidth: 78 },
+    ],
+    riskZones: [{ start: 2500, end: 3200, bonus: 5 }],
     bends: [
       { start: 110, length: 640, amp: -320 },
       { start: 1120, length: 620, amp: 360 },
@@ -346,8 +352,11 @@ const getTrack = () => tracks[state.trackId] ?? tracks.track1;
 
 const getRiskZone = (trackId) => {
   const t = tracks[trackId] ?? tracks.track1;
-  if (trackId === "track1") {
-    return { start: 2100, end: 2800, bonus: 5, entered: false, invalid: false, done: false };
+  if (Array.isArray(t.riskZones) && t.riskZones.length) {
+    const z = t.riskZones[0];
+    if (z && typeof z.start === "number" && typeof z.end === "number") {
+      return { start: z.start, end: z.end, bonus: z.bonus ?? 5, entered: false, invalid: false, done: false };
+    }
   }
   const fd = Math.max(1, t.finishDistance || 1);
   const start = Math.floor(fd * 0.28);
@@ -432,7 +441,7 @@ const sim = {
   toastUntil: 0,
   toastText: "",
   toastKind: "info",
-  narrowEntered: false,
+  narrowSeen: new Set(),
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -601,7 +610,7 @@ const resetRun = () => {
   sim.toastUntil = 0;
   sim.toastText = "";
   sim.toastKind = "info";
-  sim.narrowEntered = false;
+  sim.narrowSeen = new Set();
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
@@ -2053,11 +2062,14 @@ const updateSim = (t) => {
     sim.distance += speed * dt;
 
     const narrowNow = getNarrowSegment(yCarWorld);
-    if (narrowNow && !sim.narrowEntered) {
-      sim.narrowEntered = true;
-      sim.toastText = "前方窄路！";
-      sim.toastKind = "info";
-      sim.toastUntil = sim.elapsedMs + 1100;
+    if (narrowNow) {
+      const key = `${narrowNow.start ?? 0}_${narrowNow.length ?? 0}_${narrowNow.minHalfWidth ?? narrowNow.halfWidth ?? ""}`;
+      if (!sim.narrowSeen.has(key)) {
+        sim.narrowSeen.add(key);
+        sim.toastText = "前方窄路！";
+        sim.toastKind = "info";
+        sim.toastUntil = sim.elapsedMs + 1100;
+      }
     }
 
     const steer = sim.steerSmooth * state.sensitivity * state.steerStrength;
