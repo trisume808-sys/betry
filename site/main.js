@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-18";
+const BUILD_ID = "20260517-19";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -396,6 +396,9 @@ const sim = {
   risk: null,
   bonusFlashUntil: 0,
   bonusLast: 0,
+  toastUntil: 0,
+  toastText: "",
+  toastKind: "info",
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -561,6 +564,9 @@ const resetRun = () => {
   sim.risk = getRiskZone(state.trackId);
   sim.bonusFlashUntil = 0;
   sim.bonusLast = 0;
+  sim.toastUntil = 0;
+  sim.toastText = "";
+  sim.toastKind = "info";
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
@@ -1548,13 +1554,12 @@ const drawTopHud = (w, h) => {
   ctx.textAlign = "right";
   ctx.fillText(`得分 ${state.score}`, pad + boxW - 14, pad + 74);
 
-  const inRisk =
-    state.status === "running" &&
-    sim.risk &&
-    !sim.risk.done &&
-    state.distance >= sim.risk.start &&
-    state.distance <= sim.risk.end &&
-    !sim.risk.invalid;
+  const riskActive = state.status === "running" && sim.risk && !sim.risk.done;
+  const risk = riskActive ? sim.risk : null;
+  const distToStart = risk ? risk.start - state.distance : 1e9;
+  const preRisk = risk && !risk.entered && distToStart > 0 && distToStart < 900;
+  const inRisk = risk && risk.entered && !risk.invalid && state.distance >= risk.start && state.distance <= risk.end;
+  const riskProgress = inRisk ? clamp((state.distance - risk.start) / Math.max(1, risk.end - risk.start), 0, 1) : 0;
 
   if (sim.bonusFlashUntil > sim.elapsedMs) {
     ctx.fillStyle = "rgba(52,211,153,0.92)";
@@ -1562,10 +1567,30 @@ const drawTopHud = (w, h) => {
     ctx.font = `${subFs}px ui-sans-serif, system-ui`;
     ctx.fillText(`净跑奖励 +${sim.bonusLast}`, pad + 14, pad + 102);
   } else if (inRisk) {
+    const tx = pad + 14;
+    const ty = pad + 100;
+    const barX = pad + 14;
+    const barY = pad + 104;
+    const barW2 = Math.max(90, boxW - 28);
+    const barH2 = 7;
+    ctx.fillStyle = "rgba(34,211,238,0.92)";
+    ctx.textAlign = "left";
+    ctx.font = `${subFs}px ui-sans-serif, system-ui`;
+    ctx.fillText(`净跑挑战 +${risk.bonus}（${Math.round(riskProgress * 100)}%）`, tx, ty);
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "rgba(10,10,18,0.60)";
+    drawRoundRect(barX, barY, barW2, barH2, 6);
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "rgba(52,211,153,0.92)";
+    drawRoundRect(barX, barY, Math.max(8, barW2 * riskProgress), barH2, 6);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (preRisk) {
     ctx.fillStyle = "rgba(34,211,238,0.86)";
     ctx.textAlign = "left";
     ctx.font = `${subFs}px ui-sans-serif, system-ui`;
-    ctx.fillText(`净跑区：不碰墙/不越界 +${sim.risk.bonus}`, pad + 14, pad + 102);
+    ctx.fillText(`前方净跑区 +${risk.bonus}`, pad + 14, pad + 102);
   } else if (state.offroad) {
     ctx.fillStyle = "rgba(248,113,113,0.92)";
     ctx.textAlign = "left";
@@ -1586,6 +1611,45 @@ const drawTopHud = (w, h) => {
   drawRoundRect(bx, by, Math.max(10, barW * progress), barH, 8);
   ctx.fill();
 
+  ctx.restore();
+};
+
+const drawToast = (w, h) => {
+  if (state.status !== "running") return;
+  if (!sim.toastText || sim.toastUntil <= sim.elapsedMs) return;
+  const remain = sim.toastUntil - sim.elapsedMs;
+  const a = clamp(remain / 350, 0, 1);
+  const pad = 14;
+  const y = Math.max(120, Math.floor(h * 0.16));
+  const fs = Math.max(14, Math.floor(Math.min(w, h) * 0.03));
+  const text = String(sim.toastText);
+  const tone =
+    sim.toastKind === "success"
+      ? { fill: "rgba(52,211,153,0.92)", glow: "rgba(52,211,153,0.75)" }
+      : sim.toastKind === "fail"
+        ? { fill: "rgba(248,113,113,0.92)", glow: "rgba(248,113,113,0.75)" }
+        : { fill: "rgba(34,211,238,0.92)", glow: "rgba(34,211,238,0.75)" };
+
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.font = `700 ${fs}px ui-sans-serif, system-ui`;
+  const tw = ctx.measureText(text).width;
+  const bw = Math.min(w - pad * 2, tw + 42);
+  const bh = Math.max(40, Math.floor(fs * 2.2));
+  const x = (w - bw) / 2;
+  const yy = y;
+  ctx.fillStyle = "rgba(10,10,18,0.72)";
+  drawRoundRect(x, yy, bw, bh, 18);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(244,244,245,0.14)";
+  ctx.stroke();
+  ctx.shadowColor = tone.glow;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = tone.fill;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x + bw / 2, yy + bh / 2 + 1);
   ctx.restore();
 };
 
@@ -1971,13 +2035,28 @@ const updateSim = (t) => {
     if (sim.risk && !sim.risk.done) {
       const enteredNow = sim.prevDistance < sim.risk.start && sim.distance >= sim.risk.start;
       const inZone = sim.distance >= sim.risk.start && sim.distance <= sim.risk.end;
-      if (enteredNow) sim.risk.entered = true;
-      if (sim.risk.entered && inZone && (offroadNow || hitWall)) sim.risk.invalid = true;
+      if (enteredNow) {
+        sim.risk.entered = true;
+        sim.toastText = `进入净跑区：不碰墙/不越界 +${sim.risk.bonus}`;
+        sim.toastKind = "info";
+        sim.toastUntil = sim.elapsedMs + 1400;
+      }
+      if (sim.risk.entered && inZone && (offroadNow || hitWall)) {
+        if (!sim.risk.invalid) {
+          sim.toastText = "净跑失败";
+          sim.toastKind = "fail";
+          sim.toastUntil = sim.elapsedMs + 1200;
+        }
+        sim.risk.invalid = true;
+      }
       if (sim.risk.entered && sim.distance >= sim.risk.end) {
         if (!sim.risk.invalid) {
           state.bonus += sim.risk.bonus;
           sim.bonusLast = sim.risk.bonus;
           sim.bonusFlashUntil = sim.elapsedMs + 900;
+          sim.toastText = `净跑成功 +${sim.risk.bonus}`;
+          sim.toastKind = "success";
+          sim.toastUntil = sim.elapsedMs + 1400;
         }
         sim.risk.done = true;
       }
@@ -2048,6 +2127,7 @@ const drawFrame = (w, h) => {
   else if (state.status === "result") drawResultUi(w, h);
   else drawSetupUi(w, h);
   drawPostFx(w, h);
+  drawToast(w, h);
   drawFullscreenExitOverlay(w, h);
 };
 
