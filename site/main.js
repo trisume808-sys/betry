@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-17";
+const BUILD_ID = "20260517-18";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -346,9 +346,10 @@ const getTrack = () => tracks[state.trackId] ?? tracks.track1;
 const getRiskZone = (trackId) => {
   const t = tracks[trackId] ?? tracks.track1;
   const fd = Math.max(1, t.finishDistance || 1);
-  const start = Math.floor(fd * 0.6);
-  const end = Math.min(fd - 320, Math.floor(fd * 0.78));
-  if (end <= start + 220) return null;
+  const start = Math.floor(fd * 0.28);
+  const len = Math.min(1100, Math.max(520, Math.floor(fd * 0.1)));
+  const end = Math.min(fd - 160, start + len);
+  if (end <= start + 200) return null;
   return { start, end, bonus: 5, entered: false, invalid: false, done: false };
 };
 
@@ -383,6 +384,7 @@ const sim = {
   heading: 0,
   roadAngle: 0,
   distance: 0,
+  prevDistance: 0,
   elapsedMs: 0,
   steerSmooth: 0,
   steerAngle: 0,
@@ -547,6 +549,7 @@ const resetRun = () => {
   sim.heading = 0;
   sim.roadAngle = 0;
   sim.distance = 0;
+  sim.prevDistance = 0;
   sim.elapsedMs = 0;
   sim.steerSmooth = 0;
   sim.steerAngle = 0;
@@ -1941,6 +1944,7 @@ const updateSim = (t) => {
     const slopeFactor = clamp(1 - slope * 1.2, 0.72, 1.32);
     const speed = baseSpeed * (offroadNow ? 0.55 : 1) * slopeFactor;
 
+    sim.prevDistance = sim.distance;
     sim.distance += speed * dt;
 
     const steer = sim.steerSmooth * state.sensitivity * state.steerStrength;
@@ -1965,11 +1969,11 @@ const updateSim = (t) => {
     sim.x = nc + clampedDelta;
 
     if (sim.risk && !sim.risk.done) {
+      const enteredNow = sim.prevDistance < sim.risk.start && sim.distance >= sim.risk.start;
       const inZone = sim.distance >= sim.risk.start && sim.distance <= sim.risk.end;
-      if (inZone) {
-        sim.risk.entered = true;
-        if (offroadNow || hitWall) sim.risk.invalid = true;
-      } else if (sim.risk.entered && sim.distance > sim.risk.end) {
+      if (enteredNow) sim.risk.entered = true;
+      if (sim.risk.entered && inZone && (offroadNow || hitWall)) sim.risk.invalid = true;
+      if (sim.risk.entered && sim.distance >= sim.risk.end) {
         if (!sim.risk.invalid) {
           state.bonus += sim.risk.bonus;
           sim.bonusLast = sim.risk.bonus;
