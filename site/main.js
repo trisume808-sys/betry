@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-19";
+const BUILD_ID = "20260517-20";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -246,6 +246,7 @@ const tracks = {
     finishDistance: 12400,
     baseSpeed: 260,
     halfWidth: 250,
+    narrowSegments: [{ start: 3800, length: 720, halfWidth: 175 }],
     bends: [
       { start: 120, length: 680, amp: -260 },
       { start: 1480, length: 780, amp: 320 },
@@ -364,7 +365,24 @@ const centerX = (y) => {
   return x;
 };
 
-const halfWidth = () => getTrack().halfWidth;
+const getNarrowSegment = (y) => {
+  const list = getTrack().narrowSegments;
+  if (!Array.isArray(list) || typeof y !== "number") return null;
+  for (const seg of list) {
+    const start = seg?.start ?? 0;
+    const len = seg?.length ?? 0;
+    const end = start + len;
+    if (y >= start && y <= end) return seg;
+  }
+  return null;
+};
+
+const halfWidth = (y = 0) => {
+  const base = getTrack().halfWidth;
+  const seg = getNarrowSegment(y);
+  if (seg && typeof seg.halfWidth === "number") return Math.min(base, seg.halfWidth);
+  return base;
+};
 
 const roadAngleAt = (y) => {
   const eps = 14;
@@ -399,6 +417,7 @@ const sim = {
   toastUntil: 0,
   toastText: "",
   toastKind: "info",
+  narrowEntered: false,
   lastT: 0,
   lastTelemetryT: 0,
 };
@@ -567,6 +586,7 @@ const resetRun = () => {
   sim.toastUntil = 0;
   sim.toastText = "";
   sim.toastKind = "info";
+  sim.narrowEntered = false;
   sim.lastT = 0;
   sim.lastTelemetryT = 0;
 };
@@ -2010,6 +2030,14 @@ const updateSim = (t) => {
 
     sim.prevDistance = sim.distance;
     sim.distance += speed * dt;
+
+    const narrowNow = getNarrowSegment(yCarWorld);
+    if (narrowNow && !sim.narrowEntered) {
+      sim.narrowEntered = true;
+      sim.toastText = "前方窄路！";
+      sim.toastKind = "fail";
+      sim.toastUntil = sim.elapsedMs + 1100;
+    }
 
     const steer = sim.steerSmooth * state.sensitivity * state.steerStrength;
     sim.x += steer * speed * dt * 0.85;
