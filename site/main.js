@@ -1,7 +1,7 @@
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const randRange = (min, max) => min + (max - min) * Math.random();
-const BUILD_ID = "20260517-22";
+const BUILD_ID = "20260517-23";
 const SCORE_BASE = 100;
 const calcScore = (_ms, penalty) => Math.max(0, SCORE_BASE - penalty);
 const CAR_HALF_PX = 10;
@@ -246,7 +246,7 @@ const tracks = {
     finishDistance: 12400,
     baseSpeed: 260,
     halfWidth: 250,
-    narrowSegments: [{ start: 3600, length: 1100, minHalfWidth: 120 }],
+    narrowSegments: [{ start: 3600, length: 1100, minHalfWidth: 90 }],
     bends: [
       { start: 120, length: 680, amp: -260 },
       { start: 1480, length: 780, amp: 320 },
@@ -1247,7 +1247,8 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
   const y1 = h * VIEW_Y1_T;
   const steps = 34;
   const lookahead = 1100;
-  const roadHalfPx = Math.min(w * 0.28, 240);
+  const roadHalfPxBase = Math.min(w * 0.28, 240);
+  const baseHw = Math.max(1, getTrack().halfWidth);
   const elevScale = Math.min(0.11, h * 0.00018);
 
   const left = [];
@@ -1260,6 +1261,7 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
     const yWorld = distance + t * lookahead;
     const c = centerX(yWorld) - carX;
     const hw = Math.max(1, halfWidth(yWorld));
+    const roadHalfPx = roadHalfPxBase * clamp(hw / baseHw, 0.3, 1);
     const scale = roadHalfPx / hw;
     const cx = w / 2 + c * scale;
     const elev = elevation(yWorld);
@@ -1328,6 +1330,7 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
     const yWorld = distance + t * lookahead;
     const c = centerX(yWorld) - carX;
     const hw = Math.max(1, halfWidth(yWorld));
+    const roadHalfPx = roadHalfPxBase * clamp(hw / baseHw, 0.3, 1);
     const scale = roadHalfPx / hw;
     const cx = w / 2 + c * scale;
     const elev = elevation(yWorld);
@@ -1342,6 +1345,7 @@ const drawRoadFlat = (w, h, carX, distance, heading, danger) => {
     const yWorld = getTrack().finishDistance;
     const c = centerX(yWorld) - carX;
     const hw = Math.max(1, halfWidth(yWorld));
+    const roadHalfPx = roadHalfPxBase * clamp(hw / baseHw, 0.3, 1);
     const scale = roadHalfPx / hw;
     const cx = w / 2 + c * scale;
     const elev = elevation(yWorld);
@@ -2033,9 +2037,11 @@ const updateSim = (t) => {
     const carT = clamp((y1 - carMarkerY) / (y1 - y0), 0, 1);
     const yCarWorld = sim.distance + carT * lookahead;
     const c = centerX(yCarWorld);
-    const hw = halfWidth(yCarWorld);
-    const roadHalfPx = Math.min(w * 0.28, 240);
-    const scale = roadHalfPx / Math.max(1, hw);
+    const baseHw = Math.max(1, getTrack().halfWidth);
+    const hw = Math.max(1, halfWidth(yCarWorld));
+    const roadHalfPxBase = Math.min(w * 0.28, 240);
+    const roadHalfPx = roadHalfPxBase * clamp(hw / baseHw, 0.3, 1);
+    const scale = roadHalfPx / hw;
     const carHalfPx = CAR_HALF_PX;
     const carHalf = carHalfPx / Math.max(0.001, scale);
     const offroadNow = Math.abs(sim.x - c) > Math.max(0, hw - carHalf);
@@ -2059,8 +2065,9 @@ const updateSim = (t) => {
 
     const yCarWorldNew = sim.distance + carT * lookahead;
     const nc = centerX(yCarWorldNew);
-    const nhw = halfWidth(yCarWorldNew);
-    const nscale = roadHalfPx / Math.max(1, nhw);
+    const nhw = Math.max(1, halfWidth(yCarWorldNew));
+    const roadHalfPxNew = roadHalfPxBase * clamp(nhw / baseHw, 0.3, 1);
+    const nscale = roadHalfPxNew / nhw;
     const carHalfNew = carHalfPx / Math.max(0.001, nscale);
     const maxDelta = Math.max(0, nhw - carHalfNew);
     const rawDelta = sim.x - nc;
@@ -2134,9 +2141,10 @@ const updateSim = (t) => {
   const carT = clamp((y1 - carMarkerY) / (y1 - y0), 0, 1);
   const yCarWorldNow = sim.distance + carT * lookahead;
   const cNow = centerX(yCarWorldNow);
-  const hwNow = halfWidth(yCarWorldNow);
-  const roadHalfPxNow = Math.min(w * 0.28, 240);
-  const scaleNow = roadHalfPxNow / Math.max(1, hwNow);
+  const baseHwNow = Math.max(1, getTrack().halfWidth);
+  const hwNow = Math.max(1, halfWidth(yCarWorldNow));
+  const roadHalfPxNow = Math.min(w * 0.28, 240) * clamp(hwNow / baseHwNow, 0.3, 1);
+  const scaleNow = roadHalfPxNow / hwNow;
   const carHalfPxNow = CAR_HALF_PX;
   const carHalfNow = carHalfPxNow / Math.max(0.001, scaleNow);
   const offroadNow = state.status === "running" && Math.abs(sim.x - cNow) > Math.max(0, hwNow - carHalfNow);
